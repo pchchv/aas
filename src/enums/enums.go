@@ -17,3 +17,7 @@ func (tt TokenType) String() string {
 }
 
 type AcrLevel string
+
+func (acrl AcrLevel) String() string {
+	return string(acrl)
+}
