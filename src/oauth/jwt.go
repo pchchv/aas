@@ -82,3 +82,7 @@ func (jwt Jwt) HasScope(scope string) bool {
 	}
 	return false
 }
+
+func (jwt Jwt) IsIssuerValid(issuer string) bool {
+	return jwt.GetStringClaim("iss") == issuer
+}
