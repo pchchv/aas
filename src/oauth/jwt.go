@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -66,4 +67,18 @@ func (jwt Jwt) GetAudience() []string {
 	}
 
 	return []string{}
+}
+
+func (jwt Jwt) HasScope(scope string) bool {
+	if jwt.Claims["scope"] != nil {
+		if scopesStr, ok := jwt.Claims["scope"].(string); ok {
+			scopesArr := strings.Split(scopesStr, " ")
+			for _, s := range scopesArr {
+				if s == scope {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
