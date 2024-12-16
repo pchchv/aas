@@ -8,3 +8,7 @@ type Jwk struct {
 	N   string `json:"n"`
 	E   string `json:"e"`
 }
+
+type Jwks struct {
+	Keys []Jwk `json:"keys"`
+}
