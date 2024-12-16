@@ -49,3 +49,21 @@ func (jwt Jwt) GetTimeClaim(claimName string) time.Time {
 
 	return time.Unix(0, 0)
 }
+
+func (jwt Jwt) GetAudience() []string {
+	if jwt.Claims["aud"] != nil {
+		if audArr, ok := jwt.Claims["aud"].([]interface{}); ok {
+			result := make([]string, len(audArr))
+			for i, v := range audArr {
+				result[i] = v.(string)
+			}
+			return result
+		}
+
+		if aud, ok := jwt.Claims["aud"].(string); ok {
+			return []string{aud}
+		}
+	}
+
+	return []string{}
+}
