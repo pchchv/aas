@@ -1,6 +1,10 @@
 package oauth
 
-import "github.com/golang-jwt/jwt/v5"
+import (
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+)
 
 type Jwt struct {
 	TokenBase64 string
@@ -25,4 +29,23 @@ func (jwt Jwt) GetStringClaim(claimName string) string {
 		return jwt.Claims[claimName].(string)
 	}
 	return ""
+}
+
+func (jwt Jwt) GetBoolClaim(claimName string) *bool {
+	if jwt.Claims[claimName] != nil {
+		if b, ok := jwt.Claims[claimName].(bool); ok {
+			return &b
+		}
+	}
+	return nil
+}
+
+func (jwt Jwt) GetTimeClaim(claimName string) (zeroValue time.Time) {
+	if jwt.Claims[claimName] != nil {
+		if f64, ok := jwt.Claims[claimName].(float64); ok {
+			return time.Unix(int64(f64), 0)
+		}
+	}
+
+	return
 }
