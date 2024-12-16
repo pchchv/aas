@@ -18,3 +18,11 @@ func HashString(s string) (string, error) {
 	hex := fmt.Sprintf("%x", bs)
 	return hex, nil
 }
+
+func VerifyStringHash(hashedString string, s string) bool {
+	if hash, err := HashString(s); err != nil {
+		return false
+	} else {
+		return hash == hashedString
+	}
+}
