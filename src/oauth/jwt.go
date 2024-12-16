@@ -40,12 +40,12 @@ func (jwt Jwt) GetBoolClaim(claimName string) *bool {
 	return nil
 }
 
-func (jwt Jwt) GetTimeClaim(claimName string) (zeroValue time.Time) {
+func (jwt Jwt) GetTimeClaim(claimName string) time.Time {
 	if jwt.Claims[claimName] != nil {
 		if f64, ok := jwt.Claims[claimName].(float64); ok {
 			return time.Unix(int64(f64), 0)
 		}
 	}
 
-	return
+	return time.Unix(0, 0)
 }
