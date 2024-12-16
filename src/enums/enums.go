@@ -7,3 +7,7 @@ const (
 )
 
 type TokenType int
+
+func (tt TokenType) String() string {
+	return []string{"ID", "Bearer", "Refresh"}[tt]
+}
