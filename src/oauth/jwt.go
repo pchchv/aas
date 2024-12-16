@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pchchv/aas/src/enums"
+	"github.com/pchchv/aas/src/hashutil"
 )
 
 type Jwt struct {
@@ -96,4 +97,12 @@ func (jwt Jwt) HasScope(scope string) bool {
 
 func (jwt Jwt) IsIssuerValid(issuer string) bool {
 	return jwt.GetStringClaim("iss") == issuer
+}
+
+func (jwt Jwt) IsNonceValid(nonce string) bool {
+	if len(nonce) > 0 {
+		nonceHashFromToken := jwt.GetStringClaim("nonce")
+		return hashutil.VerifyStringHash(nonceHashFromToken, nonce)
+	}
+	return false
 }
