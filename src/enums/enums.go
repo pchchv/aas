@@ -1,5 +1,7 @@
 package enums
 
+import "github.com/pkg/errors"
+
 const (
 	TokenTypeId TokenType = iota
 	TokenTypeBearer
@@ -20,4 +22,17 @@ type AcrLevel string
 
 func (acrl AcrLevel) String() string {
 	return string(acrl)
+}
+
+func AcrLevelFromString(s string) (AcrLevel, error) {
+	switch s {
+	case AcrLevel1.String():
+		return AcrLevel1, nil
+	case AcrLevel2Optional.String():
+		return AcrLevel2Optional, nil
+	case AcrLevel2Mandatory.String():
+		return AcrLevel2Mandatory, nil
+	}
+
+	return "", errors.WithStack(errors.New("invalid ACR level " + s))
 }
