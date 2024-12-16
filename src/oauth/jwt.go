@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/pchchv/aas/src/enums"
 )
 
 type Jwt struct {
@@ -67,6 +68,16 @@ func (jwt Jwt) GetAudience() []string {
 	}
 
 	return []string{}
+}
+
+func (jwt Jwt) GetAcrLevel() *enums.AcrLevel {
+	if jwt.Claims["acr"] != nil {
+		acr := jwt.Claims["acr"].(string)
+		if acrLevel, err := enums.AcrLevelFromString(acr); err == nil {
+			return &acrLevel
+		}
+	}
+	return nil
 }
 
 func (jwt Jwt) HasScope(scope string) bool {
