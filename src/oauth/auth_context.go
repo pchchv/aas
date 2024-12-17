@@ -66,6 +66,14 @@ func (ac *AuthContext) SetScope(scope string) {
 	ac.Scope = strings.TrimSpace(strings.Join(scopeArr, " "))
 }
 
+func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLevel) enums.AcrLevel {
+	acrValuesFromAuthorizeRequest := ac.parseAcrValuesFromAuthorizeRequest()
+	if len(acrValuesFromAuthorizeRequest) > 0 {
+		return acrValuesFromAuthorizeRequest[0]
+	}
+	return defaultAcrLevelFromClient
+}
+
 func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() (arr []enums.AcrLevel) {
 	acrValues := ac.AcrValuesFromAuthorizeRequest
 	if len(strings.TrimSpace(acrValues)) > 0 {
