@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 
+	"github.com/pchchv/aas/src/constants"
 	"github.com/pchchv/aas/src/enums"
 )
 
@@ -26,4 +27,16 @@ type Client struct {
 	Permissions                             []Permission   `db:"-"`
 	RedirectURIs                            []RedirectURI  `db:"-"`
 	WebOrigins                              []WebOrigin    `db:"-"`
+}
+
+func (c *Client) IsSystemLevelClient() bool {
+	systemLevelClients := []string{
+		constants.AdminConsoleClientIdentifier,
+	}
+	for _, systemLevelClient := range systemLevelClients {
+		if c.ClientIdentifier == systemLevelClient {
+			return true
+		}
+	}
+	return false
 }
