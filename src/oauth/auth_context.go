@@ -85,6 +85,27 @@ func (ac *AuthContext) ParseRequestedMaxAge() (requestedMaxAge *int) {
 	return
 }
 
+func (ac *AuthContext) AddAuthMethod(method string) {
+	if method = strings.ToLower(strings.TrimSpace(method)); method == "" {
+		return
+	}
+
+	if ac.AuthMethods == "" {
+		ac.AuthMethods = method
+		return
+	}
+
+	lowerMethods := strings.ToLower(ac.AuthMethods)
+	methods := strings.Fields(lowerMethods)
+	for _, existingMethod := range methods {
+		if existingMethod == method {
+			return
+		}
+	}
+
+	ac.AuthMethods = ac.AuthMethods + " " + method
+}
+
 func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() (arr []enums.AcrLevel) {
 	acrValues := ac.AcrValuesFromAuthorizeRequest
 	if len(strings.TrimSpace(acrValues)) > 0 {
