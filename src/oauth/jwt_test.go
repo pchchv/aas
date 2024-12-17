@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pchchv/aas/src/hashutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -77,4 +78,54 @@ func TestIsIssuerValid(t *testing.T) {
 	jwt := Jwt{Claims: map[string]interface{}{"iss": "validIssuer"}}
 	assert.True(t, jwt.IsIssuerValid("validIssuer"))
 	assert.False(t, jwt.IsIssuerValid("invalidIssuer"))
+}
+
+func TestIsNonceValid(t *testing.T) {
+	tests := []struct {
+		name          string
+		storedNonce   string
+		providedNonce string
+		expected      bool
+	}{
+		{
+			name:          "Valid nonce",
+			storedNonce:   "validHashedNonce",
+			providedNonce: "validNonce",
+			expected:      true,
+		},
+		{
+			name:          "Invalid nonce",
+			storedNonce:   "validHashedNonce",
+			providedNonce: "invalidNonce",
+			expected:      false,
+		},
+		{
+			name:          "Empty provided nonce",
+			storedNonce:   "validHashedNonce",
+			providedNonce: "",
+			expected:      false,
+		},
+		{
+			name:          "Empty stored nonce",
+			storedNonce:   "",
+			providedNonce: "someNonce",
+			expected:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// If expect the nonce to be valid,
+			// is needed to hash the provided nonce to match the
+			// behavior of the actual implementation
+			if tt.expected {
+				hashedNonce, err := hashutil.HashString(tt.providedNonce)
+				assert.NoError(t, err)
+				tt.storedNonce = hashedNonce
+			}
+
+			jwt := Jwt{Claims: map[string]interface{}{"nonce": tt.storedNonce}}
+			assert.Equal(t, tt.expected, jwt.IsNonceValid(tt.providedNonce))
+		})
+	}
 }
