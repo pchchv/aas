@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/pchchv/aas/src/enums"
 )
 
 var (
@@ -62,4 +64,20 @@ func (ac *AuthContext) SetScope(scope string) {
 	}
 
 	ac.Scope = strings.TrimSpace(strings.Join(scopeArr, " "))
+}
+
+func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() (arr []enums.AcrLevel) {
+	acrValues := ac.AcrValuesFromAuthorizeRequest
+	if len(strings.TrimSpace(acrValues)) > 0 {
+		space := regexp.MustCompile(`\s+`)
+		acrValues = space.ReplaceAllString(acrValues, " ")
+		parts := strings.Split(acrValues, " ")
+		for _, v := range parts {
+			if acr, err := enums.AcrLevelFromString(v); err == nil && !slices.Contains(arr, acr) {
+				arr = append(arr, acr)
+			}
+		}
+	}
+
+	return
 }
