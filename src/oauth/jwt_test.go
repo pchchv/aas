@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -18,4 +19,17 @@ func TestGetStringClaim(t *testing.T) {
 	jwt := Jwt{Claims: map[string]interface{}{"test": "value"}}
 	assert.Equal(t, "value", jwt.GetStringClaim("test"))
 	assert.Equal(t, "", jwt.GetStringClaim("nonexistent"))
+}
+
+func TestGetBoolClaim(t *testing.T) {
+	jwt := Jwt{Claims: map[string]interface{}{"bool": true}}
+	assert.Equal(t, true, *jwt.GetBoolClaim("bool"))
+	assert.Nil(t, jwt.GetBoolClaim("nonexistent"))
+}
+
+func TestGetTimeClaim(t *testing.T) {
+	now := time.Now().Unix()
+	jwt := Jwt{Claims: map[string]interface{}{"time": float64(now)}}
+	assert.Equal(t, time.Unix(now, 0), jwt.GetTimeClaim("time"))
+	assert.Equal(t, time.Time{}, jwt.GetTimeClaim("nonexistent"))
 }
