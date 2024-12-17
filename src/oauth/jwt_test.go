@@ -33,3 +33,34 @@ func TestGetTimeClaim(t *testing.T) {
 	assert.Equal(t, time.Unix(now, 0), jwt.GetTimeClaim("time"))
 	assert.Equal(t, time.Time{}, jwt.GetTimeClaim("nonexistent"))
 }
+
+func TestGetAudience(t *testing.T) {
+	tests := []struct {
+		name     string
+		claims   map[string]interface{}
+		expected []string
+	}{
+		{
+			name:     "No audience",
+			claims:   map[string]interface{}{},
+			expected: []string{},
+		},
+		{
+			name:     "Single audience string",
+			claims:   map[string]interface{}{"aud": "aud1"},
+			expected: []string{"aud1"},
+		},
+		{
+			name:     "Multiple audience array",
+			claims:   map[string]interface{}{"aud": []interface{}{"aud1", "aud2"}},
+			expected: []string{"aud1", "aud2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			jwt := Jwt{Claims: tt.claims}
+			assert.Equal(t, tt.expected, jwt.GetAudience())
+		})
+	}
+}
