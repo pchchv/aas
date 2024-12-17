@@ -20,3 +20,10 @@ type AuthContext struct {
 	AuthState                     string
 	UserId                        int64
 }
+
+func (ac *AuthContext) HasScope(scope string) bool {
+	if len(ac.Scope) == 0 {
+		return false
+	}
+	return slices.Contains(strings.Split(ac.Scope, " "), scope)
+}
