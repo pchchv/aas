@@ -3,6 +3,7 @@ package oauth
 import (
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/pchchv/aas/src/enums"
@@ -72,6 +73,16 @@ func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLeve
 		return acrValuesFromAuthorizeRequest[0]
 	}
 	return defaultAcrLevelFromClient
+}
+
+func (ac *AuthContext) ParseRequestedMaxAge() (requestedMaxAge *int) {
+	if len(ac.MaxAge) > 0 {
+		if i, err := strconv.Atoi(ac.MaxAge); err == nil {
+			requestedMaxAge = &i
+		}
+	}
+
+	return
 }
 
 func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() (arr []enums.AcrLevel) {
