@@ -64,3 +64,11 @@ func TestGetAudience(t *testing.T) {
 		})
 	}
 }
+
+func TestHasScope(t *testing.T) {
+	jwt := Jwt{Claims: map[string]interface{}{"scope": "read write"}}
+	assert.True(t, jwt.HasScope("read"))
+	assert.True(t, jwt.HasScope("write"))
+	assert.False(t, jwt.HasScope("delete"))
+	assert.False(t, Jwt{Claims: map[string]interface{}{}}.HasScope("read"))
+}
