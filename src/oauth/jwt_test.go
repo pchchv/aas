@@ -72,3 +72,9 @@ func TestHasScope(t *testing.T) {
 	assert.False(t, jwt.HasScope("delete"))
 	assert.False(t, Jwt{Claims: map[string]interface{}{}}.HasScope("read"))
 }
+
+func TestIsIssuerValid(t *testing.T) {
+	jwt := Jwt{Claims: map[string]interface{}{"iss": "validIssuer"}}
+	assert.True(t, jwt.IsIssuerValid("validIssuer"))
+	assert.False(t, jwt.IsIssuerValid("invalidIssuer"))
+}
