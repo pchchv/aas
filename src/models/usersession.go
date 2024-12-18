@@ -24,3 +24,15 @@ type UserSession struct {
 	SessionIdentifier          string              `db:"session_identifier"`
 	Level2AuthConfigHasChanged bool                `db:"level2_auth_config_has_changed"`
 }
+
+func (us *UserSession) isValidSinceStarted(userSessionMaxLifetimeInSeconds int) bool {
+	utcNow := time.Now().UTC()
+	max := us.Started.Add(time.Second * time.Duration(userSessionMaxLifetimeInSeconds))
+	return utcNow.Before(max) || utcNow.Equal(max)
+}
+
+func (us *UserSession) isValidSinceLastAcessed(userSessionIdleTimeoutInSeconds int) bool {
+	utcNow := time.Now().UTC()
+	max := us.LastAccessed.Add(time.Second * time.Duration(userSessionIdleTimeoutInSeconds))
+	return utcNow.Before(max) || utcNow.Equal(max)
+}
