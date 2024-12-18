@@ -112,3 +112,22 @@ func (u *User) GetDateOfBirthFormatted() (dateOfBirthFormatted string) {
 	}
 	return
 }
+
+func (u *User) HasAddress() bool {
+	switch {
+	case len(strings.TrimSpace(u.AddressLine1)) > 0:
+		return true
+	case len(strings.TrimSpace(u.AddressLine2)) > 0:
+		return true
+	case len(strings.TrimSpace(u.AddressLocality)) > 0:
+		return true
+	case len(strings.TrimSpace(u.AddressRegion)) > 0:
+		return true
+	case len(strings.TrimSpace(u.AddressPostalCode)) > 0:
+		return true
+	case len(strings.TrimSpace(u.AddressCountry)) > 0:
+		return true
+	default:
+		return false
+	}
+}
