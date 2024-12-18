@@ -2,6 +2,8 @@ package models
 
 import (
 	"database/sql"
+	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -47,4 +49,40 @@ type User struct {
 	Groups                               []Group         `db:"-"`
 	Permissions                          []Permission    `db:"-"`
 	Attributes                           []UserAttribute `db:"-"`
+}
+
+func (u *User) GetAddressClaim() map[string]string {
+	var formatted string
+	addressClaim := make(map[string]string)
+	streetAddress := fmt.Sprintf("%v\r\n%v", u.AddressLine1, u.AddressLine2)
+	if len(strings.TrimSpace(streetAddress)) > 0 {
+		addressClaim["street_address"] = streetAddress
+		formatted += streetAddress + "\r\n"
+	}
+
+	if len(strings.TrimSpace(u.AddressLocality)) > 0 {
+		addressClaim["locality"] = u.AddressLocality
+		formatted += u.AddressLocality + "\r\n"
+	}
+
+	if len(strings.TrimSpace(u.AddressRegion)) > 0 {
+		addressClaim["region"] = u.AddressRegion
+		formatted += u.AddressRegion + "\r\n"
+	}
+
+	if len(strings.TrimSpace(u.AddressPostalCode)) > 0 {
+		addressClaim["postal_code"] = u.AddressPostalCode
+		formatted += u.AddressPostalCode + "\r\n"
+	}
+
+	if len(strings.TrimSpace(u.AddressCountry)) > 0 {
+		addressClaim["country"] = u.AddressCountry
+		formatted += u.AddressCountry + "\r\n"
+	}
+
+	if len(strings.TrimSpace(u.AddressCountry)) > 0 {
+		addressClaim["formatted"] = strings.TrimSpace(formatted)
+	}
+
+	return addressClaim
 }
