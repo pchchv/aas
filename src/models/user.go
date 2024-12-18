@@ -105,3 +105,10 @@ func (u *User) GetFullName() (fullName string) {
 
 	return
 }
+
+func (u *User) GetDateOfBirthFormatted() (dateOfBirthFormatted string) {
+	if u != nil && u.BirthDate.Valid {
+		dateOfBirthFormatted = u.BirthDate.Time.Format("2006-01-02")
+	}
+	return
+}
