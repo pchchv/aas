@@ -86,3 +86,22 @@ func (u *User) GetAddressClaim() map[string]string {
 
 	return addressClaim
 }
+
+func (u *User) GetFullName() (fullName string) {
+	if u != nil {
+		if len(u.GivenName) > 0 {
+			fullName += u.GivenName
+		}
+
+		if len(u.MiddleName) > 0 {
+			fullName += " " + u.MiddleName
+		}
+
+		if len(u.FamilyName) > 0 {
+			fullName += " " + u.FamilyName
+		}
+		fullName = strings.TrimSpace(fullName)
+	}
+
+	return
+}
