@@ -1,6 +1,10 @@
 package models
 
-import "database/sql"
+import (
+	"database/sql"
+	"slices"
+	"strings"
+)
 
 type UserConsent struct {
 	Id        int64        `db:"id" fieldtag:"pk"`
@@ -11,4 +15,11 @@ type UserConsent struct {
 	CreatedAt sql.NullTime `db:"created_at" fieldtag:"dont-update"`
 	UpdatedAt sql.NullTime `db:"updated_at"`
 	GrantedAt sql.NullTime `db:"granted_at"`
+}
+
+func (uc *UserConsent) HasScope(scope string) bool {
+	if len(uc.Scope) > 0 {
+		return slices.Contains(strings.Split(uc.Scope, " "), scope)
+	}
+	return false
 }
