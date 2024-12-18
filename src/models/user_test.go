@@ -94,3 +94,33 @@ func TestUser_GetDateOfBirthFormatted(t *testing.T) {
 		})
 	}
 }
+
+func TestUser_HasAddress(t *testing.T) {
+	tests := []struct {
+		name     string
+		user     User
+		expected bool
+	}{
+		{"Empty address", User{}, false},
+		{"Only AddressLine1", User{AddressLine1: "123 Main St"}, true},
+		{"Only AddressLine2", User{AddressLine2: "Apt 4B"}, true},
+		{"Only AddressLocality", User{AddressLocality: "Springfield"}, true},
+		{"Only AddressRegion", User{AddressRegion: "IL"}, true},
+		{"Only AddressPostalCode", User{AddressPostalCode: "12345"}, true},
+		{"Only AddressCountry", User{AddressCountry: "USA"}, true},
+		{"Full address", User{
+			AddressLine1:      "123 Main St",
+			AddressLine2:      "Apt 4B",
+			AddressLocality:   "Springfield",
+			AddressRegion:     "IL",
+			AddressPostalCode: "12345",
+			AddressCountry:    "USA",
+		}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.user.HasAddress())
+		})
+	}
+}
