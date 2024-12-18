@@ -47,3 +47,18 @@ func AcrLevelFromString(s string) (AcrLevel, error) {
 
 	return "", errors.WithStack(errors.New("invalid ACR level " + s))
 }
+
+func PasswordPolicyFromString(s string) (PasswordPolicy, error) {
+	switch s {
+	case PasswordPolicyNone.String():
+		return PasswordPolicyNone, nil
+	case PasswordPolicyLow.String():
+		return PasswordPolicyLow, nil
+	case PasswordPolicyMedium.String():
+		return PasswordPolicyMedium, nil
+	case PasswordPolicyHigh.String():
+		return PasswordPolicyHigh, nil
+	default:
+		return PasswordPolicyNone, errors.WithStack(errors.New("invalid password policy " + s))
+	}
+}
