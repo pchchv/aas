@@ -25,6 +25,14 @@ type UserSession struct {
 	Level2AuthConfigHasChanged bool                `db:"level2_auth_config_has_changed"`
 }
 
+func (us *UserSession) IsValid(userSessionIdleTimeoutInSeconds int, userSessionMaxLifetimeInSeconds int, requestedMaxAgeInSeconds *int) bool {
+	isValid := us.isValidSinceLastAcessed(userSessionIdleTimeoutInSeconds) && us.isValidSinceStarted(userSessionMaxLifetimeInSeconds)
+	if requestedMaxAgeInSeconds != nil {
+		return isValid && us.isValidSinceStarted(*requestedMaxAgeInSeconds)
+	}
+	return isValid
+}
+
 func (us *UserSession) isValidSinceStarted(userSessionMaxLifetimeInSeconds int) bool {
 	utcNow := time.Now().UTC()
 	max := us.Started.Add(time.Second * time.Duration(userSessionMaxLifetimeInSeconds))
