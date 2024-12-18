@@ -29,6 +29,12 @@ func (acrl AcrLevel) String() string {
 	return string(acrl)
 }
 
+type PasswordPolicy int
+
+func (p PasswordPolicy) String() string {
+	return []string{"none", "low", "medium", "high"}[p]
+}
+
 func AcrLevelFromString(s string) (AcrLevel, error) {
 	switch s {
 	case AcrLevel1.String():
@@ -40,10 +46,4 @@ func AcrLevelFromString(s string) (AcrLevel, error) {
 	}
 
 	return "", errors.WithStack(errors.New("invalid ACR level " + s))
-}
-
-type PasswordPolicy int
-
-func (p PasswordPolicy) String() string {
-	return []string{"none", "low", "medium", "high"}[p]
 }
