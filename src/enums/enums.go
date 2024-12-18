@@ -43,3 +43,7 @@ func AcrLevelFromString(s string) (AcrLevel, error) {
 }
 
 type PasswordPolicy int
+
+func (p PasswordPolicy) String() string {
+	return []string{"none", "low", "medium", "high"}[p]
+}
