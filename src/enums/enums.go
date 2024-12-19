@@ -95,3 +95,16 @@ func KeyStateFromString(s string) (KeyState, error) {
 		return KeyStateCurrent, errors.WithStack(errors.New("invalid key state " + s))
 	}
 }
+
+func ThreeStateSettingFromString(s string) (ThreeStateSetting, error) {
+	switch s {
+	case ThreeStateSettingOn.String():
+		return ThreeStateSettingOn, nil
+	case ThreeStateSettingOff.String():
+		return ThreeStateSettingOff, nil
+	case ThreeStateSettingDefault.String():
+		return ThreeStateSettingDefault, nil
+	default:
+		return ThreeStateSettingOn, errors.WithStack(errors.New("invalid three state setting " + s))
+	}
+}
