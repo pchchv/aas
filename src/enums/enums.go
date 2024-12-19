@@ -127,3 +127,15 @@ func ThreeStateSettingFromString(s string) (ThreeStateSetting, error) {
 		return ThreeStateSettingOn, errors.WithStack(errors.New("invalid three state setting " + s))
 	}
 }
+
+func SMTPEncryptionFromString(s string) (SMTPEncryption, error) {
+	switch s {
+	case SMTPEncryptionNone.String():
+		return SMTPEncryptionNone, nil
+	case SMTPEncryptionSSLTLS.String():
+		return SMTPEncryptionSSLTLS, nil
+	case SMTPEncryptionSTARTTLS.String():
+		return SMTPEncryptionSTARTTLS, nil
+	}
+	return SMTPEncryptionNone, errors.WithStack(errors.New("invalid SMTP encryption " + s))
+}
