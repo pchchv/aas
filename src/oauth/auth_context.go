@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/pchchv/aas/src/enums"
+	"github.com/pchchv/aas/src/models"
 )
 
 var (
@@ -65,6 +66,37 @@ func (ac *AuthContext) SetScope(scope string) {
 	}
 
 	ac.Scope = strings.TrimSpace(strings.Join(scopeArr, " "))
+}
+
+func (ac *AuthContext) SetAcrLevel(targetAcrLevel enums.AcrLevel, userSession *models.UserSession) (err error) {
+	if userSession == nil {
+		ac.AcrLevel = targetAcrLevel.String()
+		return nil
+	}
+
+	userSessionAcrLevel, err := enums.AcrLevelFromString(userSession.AcrLevel)
+	if err != nil {
+		return
+	}
+
+	switch targetAcrLevel {
+	case enums.AcrLevel1:
+		if userSessionAcrLevel == enums.AcrLevel2Optional || userSessionAcrLevel == enums.AcrLevel2Mandatory {
+			ac.AcrLevel = userSessionAcrLevel.String()
+		} else {
+			ac.AcrLevel = targetAcrLevel.String()
+		}
+	case enums.AcrLevel2Optional:
+		if userSessionAcrLevel == enums.AcrLevel2Mandatory {
+			ac.AcrLevel = userSessionAcrLevel.String()
+		} else {
+			ac.AcrLevel = targetAcrLevel.String()
+		}
+	default:
+		ac.AcrLevel = targetAcrLevel.String()
+	}
+
+	return nil
 }
 
 func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLevel) enums.AcrLevel {
