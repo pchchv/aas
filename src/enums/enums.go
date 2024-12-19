@@ -23,6 +23,9 @@ const (
 	ThreeStateSettingOn ThreeStateSetting = iota
 	ThreeStateSettingOff
 	ThreeStateSettingDefault
+
+	AuthMethodPassword AuthMethod = iota
+	AuthMethodOTP
 )
 
 type TokenType int
@@ -54,6 +57,8 @@ type ThreeStateSetting int
 func (tss ThreeStateSetting) String() string {
 	return []string{"on", "off", "default"}[tss]
 }
+
+type AuthMethod int
 
 func AcrLevelFromString(s string) (AcrLevel, error) {
 	switch s {
