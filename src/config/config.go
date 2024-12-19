@@ -2,6 +2,8 @@ package config
 
 import (
 	"flag"
+	"os"
+	"strings"
 	"sync"
 )
 
@@ -144,4 +146,11 @@ func load() {
 	flag.StringVar(&cfg.AppName, "appname", cfg.AppName, "Default app name")
 
 	flag.Parse()
+}
+
+func getEnv(key string, val string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		val = value
+	}
+	return strings.TrimSpace(val)
 }
