@@ -60,6 +60,10 @@ func (tss ThreeStateSetting) String() string {
 
 type AuthMethod int
 
+func (am AuthMethod) String() string {
+	return []string{"pwd", "otp"}[am]
+}
+
 func AcrLevelFromString(s string) (AcrLevel, error) {
 	switch s {
 	case AcrLevel1.String():
