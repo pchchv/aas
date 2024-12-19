@@ -41,6 +41,10 @@ func (p PasswordPolicy) String() string {
 
 type KeyState int
 
+func (ks KeyState) String() string {
+	return []string{"current", "previous", "next"}[ks]
+}
+
 func AcrLevelFromString(s string) (AcrLevel, error) {
 	switch s {
 	case AcrLevel1.String():
