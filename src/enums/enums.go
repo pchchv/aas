@@ -72,3 +72,16 @@ func PasswordPolicyFromString(s string) (PasswordPolicy, error) {
 		return PasswordPolicyNone, errors.WithStack(errors.New("invalid password policy " + s))
 	}
 }
+
+func KeyStateFromString(s string) (KeyState, error) {
+	switch s {
+	case KeyStateCurrent.String():
+		return KeyStateCurrent, nil
+	case KeyStatePrevious.String():
+		return KeyStatePrevious, nil
+	case KeyStateNext.String():
+		return KeyStateNext, nil
+	default:
+		return KeyStateCurrent, errors.WithStack(errors.New("invalid key state " + s))
+	}
+}
