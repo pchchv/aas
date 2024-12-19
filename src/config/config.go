@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -97,6 +98,55 @@ func setActiveServer(server string) {
 }
 
 func load() {
+	cfg = Config{
+		AuthServer: ServerConfig{
+			BaseURL:            getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090"),
+			InternalBaseURL:    getEnv("GOIABADA_AUTHSERVER_INTERNALBASEURL", ""),
+			ListenHostHttps:    getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "0.0.0.0"),
+			ListenPortHttps:    getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", 9443),
+			ListenHostHttp:     getEnv("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "0.0.0.0"),
+			ListenPortHttp:     getEnvAsInt("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", 9090),
+			TrustProxyHeaders:  getEnvAsBool("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS"),
+			SetCookieSecure:    getEnvAsBool("GOIABADA_AUTHSERVER_SET_COOKIE_SECURE"),
+			LogHttpRequests:    getEnvAsBool("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS"),
+			CertFile:           getEnv("GOIABADA_AUTHSERVER_CERTFILE", ""),
+			KeyFile:            getEnv("GOIABADA_AUTHSERVER_KEYFILE", ""),
+			LogSQL:             getEnvAsBool("GOIABADA_AUTHSERVER_LOG_SQL"),
+			AuditLogsInConsole: getEnvAsBool("GOIABADA_AUTHSERVER_AUDIT_LOGS_IN_CONSOLE"),
+			StaticDir:          getEnv("GOIABADA_AUTHSERVER_STATICDIR", ""),
+			TemplateDir:        getEnv("GOIABADA_AUTHSERVER_TEMPLATEDIR", ""),
+		},
+		AdminConsole: ServerConfig{
+			BaseURL:            getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),
+			InternalBaseURL:    getEnv("GOIABADA_ADMINCONSOLE_INTERNALBASEURL", ""),
+			ListenHostHttps:    getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "0.0.0.0"),
+			ListenPortHttps:    getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", 9444),
+			ListenHostHttp:     getEnv("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "0.0.0.0"),
+			ListenPortHttp:     getEnvAsInt("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", 9091),
+			TrustProxyHeaders:  getEnvAsBool("GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS"),
+			SetCookieSecure:    getEnvAsBool("GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE"),
+			LogHttpRequests:    getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS"),
+			CertFile:           getEnv("GOIABADA_ADMINCONSOLE_CERTFILE", ""),
+			KeyFile:            getEnv("GOIABADA_ADMINCONSOLE_KEYFILE", ""),
+			LogSQL:             getEnvAsBool("GOIABADA_ADMINCONSOLE_LOG_SQL"),
+			AuditLogsInConsole: getEnvAsBool("GOIABADA_ADMINCONSOLE_AUDIT_LOGS_IN_CONSOLE"),
+			StaticDir:          getEnv("GOIABADA_ADMINCONSOLE_STATICDIR", ""),
+			TemplateDir:        getEnv("GOIABADA_ADMINCONSOLE_TEMPLATEDIR", ""),
+		},
+		Database: DatabaseConfig{
+			Type:     getEnv("GOIABADA_DB_TYPE", "sqlite"),
+			Username: getEnv("GOIABADA_DB_USERNAME", "root"),
+			Password: getEnv("GOIABADA_DB_PASSWORD", ""),
+			Host:     getEnv("GOIABADA_DB_HOST", "localhost"),
+			Port:     getEnvAsInt("GOIABADA_DB_PORT", 3306),
+			Name:     getEnv("GOIABADA_DB_NAME", "goiabada"),
+			DSN:      getEnv("GOIABADA_DB_DSN", "file::memory:?cache=shared"),
+		},
+		AdminEmail:    getEnv("GOIABADA_ADMIN_EMAIL", "admin"),
+		AdminPassword: getEnv("GOIABADA_ADMIN_PASSWORD", "changeme"),
+		AppName:       getEnv("GOIABADA_APPNAME", "Goiabada"),
+	}
+
 	// Auth server
 	flag.StringVar(&cfg.AuthServer.BaseURL, "authserver-baseurl", cfg.AuthServer.BaseURL, "Goiabada auth server base URL")
 	flag.StringVar(&cfg.AuthServer.InternalBaseURL, "authserver-internalbaseurl", cfg.AuthServer.InternalBaseURL, "Goiabada auth server internal base URL")
