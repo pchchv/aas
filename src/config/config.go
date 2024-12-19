@@ -42,6 +42,10 @@ type Config struct {
 	AdminPassword string
 }
 
+func Get() *ServerConfig {
+	return activeConfig
+}
+
 // setActiveServer sets the active server configuration
 func setActiveServer(server string) {
 	switch server {
