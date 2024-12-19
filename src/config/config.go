@@ -1,5 +1,10 @@
 package config
 
+var (
+	cfg          Config
+	activeConfig *ServerConfig
+)
+
 type ServerConfig struct {
 	BaseURL            string
 	LogSQL             bool
@@ -35,4 +40,16 @@ type Config struct {
 	AuthServer    ServerConfig
 	AdminConsole  ServerConfig
 	AdminPassword string
+}
+
+// setActiveServer sets the active server configuration
+func setActiveServer(server string) {
+	switch server {
+	case "AuthServer":
+		activeConfig = &cfg.AuthServer
+	case "AdminConsole":
+		activeConfig = &cfg.AdminConsole
+	default:
+		panic("Invalid active server configuration specified")
+	}
 }
