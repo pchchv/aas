@@ -66,6 +66,10 @@ func GetAuthServer() *ServerConfig {
 	return &cfg.AuthServer
 }
 
+func GetDatabase() *DatabaseConfig {
+	return &cfg.Database
+}
+
 // setActiveServer sets the active server configuration
 func setActiveServer(server string) {
 	switch server {
