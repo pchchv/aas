@@ -46,6 +46,18 @@ func Get() *ServerConfig {
 	return activeConfig
 }
 
+func GetAdminEmail() string {
+	return cfg.AdminEmail
+}
+
+func GetAdminPassword() string {
+	return cfg.AdminPassword
+}
+
+func GetAdminConsole() *ServerConfig {
+	return &cfg.AdminConsole
+}
+
 // setActiveServer sets the active server configuration
 func setActiveServer(server string) {
 	switch server {
