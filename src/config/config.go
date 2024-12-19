@@ -17,3 +17,13 @@ type ServerConfig struct {
 	TemplateDir        string
 	AuditLogsInConsole bool
 }
+
+type DatabaseConfig struct {
+	DSN      string
+	Type     string
+	Name     string
+	Host     string
+	Port     int
+	Password string
+	Username string
+}
