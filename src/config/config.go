@@ -27,3 +27,12 @@ type DatabaseConfig struct {
 	Password string
 	Username string
 }
+
+type Config struct {
+	AppName       string
+	Database      DatabaseConfig
+	AdminEmail    string
+	AuthServer    ServerConfig
+	AdminConsole  ServerConfig
+	AdminPassword string
+}
