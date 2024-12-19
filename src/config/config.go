@@ -154,3 +154,19 @@ func getEnv(key string, val string) string {
 	}
 	return strings.TrimSpace(val)
 }
+
+func getEnvAsInt(key string, val int) int {
+	valueStr := getEnv(key, "")
+	if value, err := strconv.Atoi(strings.TrimSpace(valueStr)); err == nil {
+		val = value
+	}
+	return val
+}
+
+func getEnvAsBool(key string) bool {
+	valueStr := getEnv(key, "")
+	if value, err := strconv.ParseBool(strings.TrimSpace(valueStr)); err == nil {
+		return value
+	}
+	return false
+}
