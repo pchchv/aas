@@ -26,6 +26,10 @@ const (
 
 	AuthMethodPassword AuthMethod = iota
 	AuthMethodOTP
+
+	SMTPEncryptionNone SMTPEncryption = iota
+	SMTPEncryptionSSLTLS
+	SMTPEncryptionSTARTTLS
 )
 
 type TokenType int
@@ -62,6 +66,12 @@ type AuthMethod int
 
 func (am AuthMethod) String() string {
 	return []string{"pwd", "otp"}[am]
+}
+
+type SMTPEncryption int
+
+func (se SMTPEncryption) String() string {
+	return []string{"none", "ssltls", "starttls"}[se]
 }
 
 func AcrLevelFromString(s string) (AcrLevel, error) {
