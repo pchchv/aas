@@ -58,6 +58,14 @@ func GetAdminConsole() *ServerConfig {
 	return &cfg.AdminConsole
 }
 
+func GetAppName() string {
+	return cfg.AppName
+}
+
+func GetAuthServer() *ServerConfig {
+	return &cfg.AuthServer
+}
+
 // setActiveServer sets the active server configuration
 func setActiveServer(server string) {
 	switch server {
