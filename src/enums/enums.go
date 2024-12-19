@@ -19,6 +19,10 @@ const (
 	KeyStateCurrent KeyState = iota
 	KeyStatePrevious
 	KeyStateNext
+
+	ThreeStateSettingOn ThreeStateSetting = iota
+	ThreeStateSettingOff
+	ThreeStateSettingDefault
 )
 
 type TokenType int
@@ -44,6 +48,8 @@ type KeyState int
 func (ks KeyState) String() string {
 	return []string{"current", "previous", "next"}[ks]
 }
+
+type ThreeStateSetting int
 
 func AcrLevelFromString(s string) (AcrLevel, error) {
 	switch s {
