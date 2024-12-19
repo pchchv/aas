@@ -15,6 +15,10 @@ const (
 	PasswordPolicyLow                          // at least 6 chars
 	PasswordPolicyMedium                       // at least 8 chars. Must contain: 1 uppercase, 1 lowercase and 1 number
 	PasswordPolicyHigh                         // at least 10 chars. Must contain: 1 uppercase, 1 lowercase, 1 number and 1 special character/symbol
+
+	KeyStateCurrent KeyState = iota
+	KeyStatePrevious
+	KeyStateNext
 )
 
 type TokenType int
@@ -34,6 +38,8 @@ type PasswordPolicy int
 func (p PasswordPolicy) String() string {
 	return []string{"none", "low", "medium", "high"}[p]
 }
+
+type KeyState int
 
 func AcrLevelFromString(s string) (AcrLevel, error) {
 	switch s {
