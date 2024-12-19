@@ -1,7 +1,10 @@
 package config
 
+import "sync"
+
 var (
 	cfg          Config
+	once         sync.Once
 	activeConfig *ServerConfig
 )
 
@@ -42,6 +45,12 @@ type Config struct {
 	AdminPassword string
 }
 
+// Init initializes the configuration and sets the active server.
+func Init(server string) {
+	once.Do(load)
+	setActiveServer(server)
+}
+
 func Get() *ServerConfig {
 	return activeConfig
 }
@@ -70,7 +79,7 @@ func GetDatabase() *DatabaseConfig {
 	return &cfg.Database
 }
 
-// setActiveServer sets the active server configuration
+// setActiveServer sets the active server configuration.
 func setActiveServer(server string) {
 	switch server {
 	case "AuthServer":
@@ -80,4 +89,7 @@ func setActiveServer(server string) {
 	default:
 		panic("Invalid active server configuration specified")
 	}
+}
+
+func load() {
 }
