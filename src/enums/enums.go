@@ -51,6 +51,10 @@ func (ks KeyState) String() string {
 
 type ThreeStateSetting int
 
+func (tss ThreeStateSetting) String() string {
+	return []string{"on", "off", "default"}[tss]
+}
+
 func AcrLevelFromString(s string) (AcrLevel, error) {
 	switch s {
 	case AcrLevel1.String():
