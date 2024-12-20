@@ -32,3 +32,14 @@ func TestEncodePublicKeyToPEM(t *testing.T) {
 	assert.NotNil(t, block)
 	assert.Equal(t, "RSA PUBLIC KEY", block.Type)
 }
+
+func TestMarshalRSAPublicKeyToJWK(t *testing.T) {
+	privateKey, err := GeneratePrivateKey(2048)
+	assert.NoError(t, err)
+
+	publicKey := &privateKey.PublicKey
+	kid := "test-key-id"
+	publicKeyJWK, err := MarshalRSAPublicKeyToJWK(publicKey, kid)
+	assert.NoError(t, err)
+	assert.NotNil(t, publicKeyJWK)
+}
