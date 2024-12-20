@@ -30,6 +30,10 @@ const (
 	SMTPEncryptionNone SMTPEncryption = iota
 	SMTPEncryptionSSLTLS
 	SMTPEncryptionSTARTTLS
+
+	GenderFemale Gender = iota
+	GenderMale
+	GenderOther
 )
 
 type TokenType int
@@ -72,6 +76,12 @@ type SMTPEncryption int
 
 func (se SMTPEncryption) String() string {
 	return []string{"none", "ssltls", "starttls"}[se]
+}
+
+type Gender int
+
+func (g Gender) String() string {
+	return []string{"female", "male"}[g]
 }
 
 func AcrLevelFromString(s string) (AcrLevel, error) {
