@@ -35,3 +35,20 @@ func TestEncryptText_InvalidKeyLength(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, encryptedText)
 }
+
+func TestDecryptText_EmptyText(t *testing.T) {
+	encryptionKey := []byte("thisis32bitlongpassphraseimusing!")
+
+	decryptedText, err := DecryptText(nil, encryptionKey)
+	assert.Error(t, err)
+	assert.Empty(t, decryptedText)
+}
+
+func TestDecryptText_InvalidKeyLength(t *testing.T) {
+	encryptionKey := []byte("shortkey")
+	encryptedText := []byte("someencryptedtext")
+
+	decryptedText, err := DecryptText(encryptedText, encryptionKey)
+	assert.Error(t, err)
+	assert.Empty(t, decryptedText)
+}
