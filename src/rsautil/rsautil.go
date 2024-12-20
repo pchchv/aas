@@ -3,7 +3,12 @@ package rsautil
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
+	"math/big"
+
+	"github.com/pkg/errors"
 )
 
 func EncodePrivateKeyToPEM(privateKey *rsa.PrivateKey) (privatePEM []byte) {
@@ -30,6 +35,30 @@ func EncodePublicKeyToPEM(publicKey *rsa.PublicKey) (pubkey_pem []byte, err erro
 				Bytes: pubkey_bytes,
 			},
 		)
+	}
+
+	return
+}
+
+func MarshalRSAPublicKeyToJWK(publicKey *rsa.PublicKey, kid string) (publicKeyJWK []byte, err error) {
+	jwt := struct {
+		Alg string `json:"alg"`
+		Kid string `json:"kid"`
+		Kty string `json:"kty"`
+		Use string `json:"use"`
+		N   string `json:"n"`
+		E   string `json:"e"`
+	}{
+		Alg: "RS256",
+		Kid: kid,
+		Kty: "RSA",
+		Use: "sig",
+		N:   base64.RawURLEncoding.EncodeToString(publicKey.N.Bytes()),
+		E:   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(publicKey.E)).Bytes()),
+	}
+
+	if publicKeyJWK, err = json.MarshalIndent(jwt, "", "  "); err != nil {
+		return nil, errors.Wrap(err, "unable to marshal public key to JSON")
 	}
 
 	return
