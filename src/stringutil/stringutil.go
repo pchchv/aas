@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	chars   = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_."
+	nums    = "0123456789"
 	letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	chars   = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_."
 )
 
 func ConvertToString(v interface{}) string {
@@ -50,4 +51,17 @@ func GenerateRandomLetterString(length int) string {
 	}
 
 	return sb.String()
+}
+
+func GenerateRandomNumberString(length int) string {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		return ""
+	}
+
+	for i, b := range bytes {
+		bytes[i] = nums[b%byte(len(nums))]
+	}
+
+	return string(bytes)
 }
