@@ -1,6 +1,7 @@
 package encryption
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,4 +52,20 @@ func TestDecryptText_InvalidKeyLength(t *testing.T) {
 	decryptedText, err := DecryptText(encryptedText, encryptionKey)
 	assert.Error(t, err)
 	assert.Empty(t, decryptedText)
+}
+
+func TestAesGcmEncryption(t *testing.T) {
+	clientSecret := "thisis32bitlongpassphraseimusing!"
+	idTokenUnencrypted := "idToken123"
+
+	encryptedText, err := AesGcmEncryption(idTokenUnencrypted, clientSecret)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, encryptedText)
+
+	decodedEncryptedText, err := base64.StdEncoding.DecodeString(encryptedText)
+	assert.NoError(t, err)
+
+	decryptedText, err := DecryptText(decodedEncryptedText, []byte(clientSecret))
+	assert.NoError(t, err)
+	assert.Equal(t, idTokenUnencrypted, decryptedText)
 }
