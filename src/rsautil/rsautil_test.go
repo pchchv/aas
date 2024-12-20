@@ -43,3 +43,12 @@ func TestMarshalRSAPublicKeyToJWK(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, publicKeyJWK)
 }
+
+func TestGeneratePrivateKey(t *testing.T) {
+	privateKey, err := GeneratePrivateKey(2048)
+	assert.NoError(t, err)
+	assert.NotNil(t, privateKey)
+
+	err = privateKey.Validate()
+	assert.NoError(t, err)
+}
