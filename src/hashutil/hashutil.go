@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // HashString can hash strings of any length
@@ -25,4 +26,13 @@ func VerifyStringHash(hashedString string, s string) bool {
 	} else {
 		return hash == hashedString
 	}
+}
+
+// Maximum length for password is 72 bytes.
+func HashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to hash")
+	}
+	return string(hash), nil
 }
