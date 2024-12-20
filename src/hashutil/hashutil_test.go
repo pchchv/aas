@@ -1,6 +1,10 @@
 package hashutil
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/brianvoe/gofakeit/v6"
+)
 
 func TestHashString(t *testing.T) {
 	tests := []struct {
@@ -44,6 +48,32 @@ func TestVerifyStringHash(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := VerifyStringHash(tt.hashedString, tt.input); got != tt.wantVerified {
 				t.Errorf("VerifyStringHash() = %v, want %v", got, tt.wantVerified)
+			}
+		})
+	}
+}
+
+func TestHashPassword(t *testing.T) {
+	tests := []struct {
+		name     string
+		password string
+		wantErr  bool
+	}{
+		{"Normal password", "password123", false},
+		{"Empty password", "", false},
+		{"Max length password", gofakeit.LetterN(72), false},
+		{"Exceeds max length", gofakeit.LetterN(73), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := HashPassword(tt.password)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("HashPassword() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && got == "" {
+				t.Errorf("HashPassword() returned empty string")
 			}
 		})
 	}
