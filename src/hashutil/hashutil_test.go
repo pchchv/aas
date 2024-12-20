@@ -78,3 +78,27 @@ func TestHashPassword(t *testing.T) {
 		})
 	}
 }
+
+func TestVerifyPasswordHash(t *testing.T) {
+	password := "password123"
+	hashedPassword, _ := HashPassword(password)
+
+	tests := []struct {
+		name           string
+		hashedPassword string
+		password       string
+		wantVerified   bool
+	}{
+		{"Correct password", hashedPassword, password, true},
+		{"Incorrect password", hashedPassword, "wrongpassword", false},
+		{"Empty password", hashedPassword, "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := VerifyPasswordHash(tt.hashedPassword, tt.password); got != tt.wantVerified {
+				t.Errorf("VerifyPasswordHash() = %v, want %v", got, tt.wantVerified)
+			}
+		})
+	}
+}
