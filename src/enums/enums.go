@@ -149,3 +149,7 @@ func SMTPEncryptionFromString(s string) (SMTPEncryption, error) {
 	}
 	return SMTPEncryptionNone, errors.WithStack(errors.New("invalid SMTP encryption " + s))
 }
+
+func IsGenderValid(i int) bool {
+	return i >= 0 && i <= int(GenderOther)
+}
