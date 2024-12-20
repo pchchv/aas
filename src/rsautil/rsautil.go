@@ -1,6 +1,7 @@
 package rsautil
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
@@ -59,6 +60,18 @@ func MarshalRSAPublicKeyToJWK(publicKey *rsa.PublicKey, kid string) (publicKeyJW
 
 	if publicKeyJWK, err = json.MarshalIndent(jwt, "", "  "); err != nil {
 		return nil, errors.Wrap(err, "unable to marshal public key to JSON")
+	}
+
+	return
+}
+
+func GeneratePrivateKey(bitSize int) (privateKey *rsa.PrivateKey, err error) {
+	if privateKey, err = rsa.GenerateKey(rand.Reader, bitSize); err != nil {
+		return nil, err
+	}
+
+	if err = privateKey.Validate(); err != nil {
+		return nil, err
 	}
 
 	return
