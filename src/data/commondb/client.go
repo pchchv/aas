@@ -120,6 +120,18 @@ func (d *CommonDB) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier stri
 	return d.getClientCommon(tx, selectBuilder, clientStruct)
 }
 
+func (d *CommonDB) DeleteClient(tx *sql.Tx, clientId int64) error {
+	clientStruct := sqlbuilder.NewStruct(new(models.Client)).For(d.Flavor)
+	deleteBuilder := clientStruct.DeleteFrom("clients")
+	deleteBuilder.Where(deleteBuilder.Equal("id", clientId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete client")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, clientStruct *sqlbuilder.Struct) (*models.Client, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
