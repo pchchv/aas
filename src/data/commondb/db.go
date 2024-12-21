@@ -73,3 +73,15 @@ func (d *CommonDB) BeginTransaction() (tx *sql.Tx, err error) {
 	}
 	return
 }
+
+func (d *CommonDB) RollbackTransaction(tx *sql.Tx) (err error) {
+	if config.Get().LogSQL {
+		slog.Info("rolling back transaction")
+	}
+
+	if err = tx.Rollback(); err != nil {
+		return errors.Wrap(err, "unable to rollback transaction")
+	}
+
+	return nil
+}
