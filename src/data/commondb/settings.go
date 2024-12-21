@@ -44,6 +44,25 @@ func (d *CommonDB) CreateSettings(tx *sql.Tx, settings *models.Settings) error {
 	return nil
 }
 
+func (d *CommonDB) UpdateSettings(tx *sql.Tx, settings *models.Settings) (err error) {
+	if settings.Id == 0 {
+		return errors.WithStack(errors.New("can't update settings with id 0"))
+	}
+
+	originalUpdatedAt := settings.UpdatedAt
+	settings.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	settingsStruct := sqlbuilder.NewStruct(new(models.Settings)).For(d.Flavor)
+	updateBuilder := settingsStruct.WithoutTag("pk").WithoutTag("dont-update").Update("settings", settings)
+	updateBuilder.Where(updateBuilder.Equal("id", settings.Id))
+	sql, args := updateBuilder.Build()
+	if _, err = d.ExecSql(tx, sql, args...); err != nil {
+		settings.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update settings")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, settingsStruct *sqlbuilder.Struct) (*models.Settings, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
