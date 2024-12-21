@@ -71,3 +71,7 @@ func (d *MySQLDB) CommitTransaction(tx *sql.Tx) error {
 func (d *MySQLDB) RollbackTransaction(tx *sql.Tx) error {
 	return d.CommonDB.RollbackTransaction(tx)
 }
+
+func (d *MySQLDB) IsEmpty() (bool, error) {
+	return d.CommonDB.IsEmpty()
+}
