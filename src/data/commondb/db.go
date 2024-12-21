@@ -62,3 +62,14 @@ func (d *CommonDB) QuerySql(tx *sql.Tx, sql string, args ...any) (result *sql.Ro
 	}
 	return
 }
+
+func (d *CommonDB) BeginTransaction() (tx *sql.Tx, err error) {
+	if config.Get().LogSQL {
+		slog.Info("beginning transaction")
+	}
+
+	if tx, err = d.DB.Begin(); err != nil {
+		return nil, errors.Wrap(err, "unable to begin transaction")
+	}
+	return
+}
