@@ -33,10 +33,10 @@ func (d *CommonDB) Log(sql string, args ...any) {
 	}
 }
 
-func (d *CommonDB) ExecSql(tx *sql.Tx, sql string, args ...any) ((result sql.Result, err error) {
+func (d *CommonDB) ExecSql(tx *sql.Tx, sql string, args ...any) (result sql.Result, err error) {
 	d.Log(sql, args...)
 	if tx != nil {
-		if result, err := tx.Exec(sql, args...); err != nil {
+		if result, err = tx.Exec(sql, args...); err != nil {
 			result, err = nil, errors.Wrap(err, "unable to execute SQL")
 		}
 		return
@@ -51,8 +51,8 @@ func (d *CommonDB) ExecSql(tx *sql.Tx, sql string, args ...any) ((result sql.Res
 func (d *CommonDB) QuerySql(tx *sql.Tx, sql string, args ...any) (result *sql.Rows, err error) {
 	d.Log(sql, args...)
 	if tx != nil {
-		if result, err := tx.Query(sql, args...); err != nil {
-			result, err =  nil, errors.Wrap(err, "unable to execute SQL")
+		if result, err = tx.Query(sql, args...); err != nil {
+			result, err = nil, errors.Wrap(err, "unable to execute SQL")
 		}
 		return
 	}
