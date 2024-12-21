@@ -10,3 +10,10 @@ type CommonDB struct {
 	DB     *sql.DB
 	Flavor sqlbuilder.Flavor
 }
+
+func NewCommonDB(db *sql.DB, flavor sqlbuilder.Flavor) *CommonDB {
+	return &CommonDB{
+		DB:     db,
+		Flavor: flavor,
+	}
+}
