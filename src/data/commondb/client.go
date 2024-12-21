@@ -54,3 +54,30 @@ func (d *CommonDB) UpdateClient(tx *sql.Tx, client *models.Client) (err error) {
 
 	return nil
 }
+
+func (d *CommonDB) GetClientsByIds(tx *sql.Tx, clientIds []int64) (clients []models.Client, err error) {
+	if len(clientIds) == 0 {
+		return []models.Client{}, nil
+	}
+
+	clientStruct := sqlbuilder.NewStruct(new(models.Client)).For(d.Flavor)
+	selectBuilder := clientStruct.SelectFrom("clients")
+	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(clientIds)...))
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var client models.Client
+		addr := clientStruct.Addr(&client)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan client")
+		}
+		clients = append(clients, client)
+	}
+
+	return
+}
