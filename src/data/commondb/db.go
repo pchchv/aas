@@ -85,3 +85,15 @@ func (d *CommonDB) RollbackTransaction(tx *sql.Tx) (err error) {
 
 	return nil
 }
+
+func (d *CommonDB) CommitTransaction(tx *sql.Tx) (err error) {
+	if config.Get().LogSQL {
+		slog.Info("committing transaction")
+	}
+
+	if err = tx.Commit(); err != nil {
+		return errors.Wrap(err, "unable to commit transaction")
+	}
+
+	return nil
+}
