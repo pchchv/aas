@@ -103,3 +103,24 @@ func (d *CommonDB) GetAllClients(tx *sql.Tx) (clients []models.Client, err error
 
 	return
 }
+
+func (d *CommonDB) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, clientStruct *sqlbuilder.Struct) (*models.Client, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var client models.Client
+	if rows.Next() {
+		addr := clientStruct.Addr(&client)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan client")
+		}
+		return &client, nil
+	}
+
+	return nil, nil
+}
