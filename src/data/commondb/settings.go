@@ -8,6 +8,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+func (d *CommonDB) GetSettingsById(tx *sql.Tx, settingsId int64) (*models.Settings, error) {
+	settingsStruct := sqlbuilder.NewStruct(new(models.Settings)).For(d.Flavor)
+	selectBuilder := settingsStruct.SelectFrom("settings")
+	selectBuilder.Where(selectBuilder.Equal("id", settingsId))
+
+	return d.getSettingsCommon(tx, selectBuilder, settingsStruct)
+}
+
 func (d *CommonDB) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, settingsStruct *sqlbuilder.Struct) (*models.Settings, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
