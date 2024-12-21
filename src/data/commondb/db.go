@@ -7,6 +7,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/pchchv/aas/src/config"
+	"github.com/pkg/errors"
 )
 
 type CommonDB struct {
@@ -30,4 +31,34 @@ func (d *CommonDB) Log(sql string, args ...any) {
 		}
 		slog.Info(fmt.Sprintf("sql args: %v", argsStr))
 	}
+}
+
+func (d *CommonDB) ExecSql(tx *sql.Tx, sql string, args ...any) ((result sql.Result, err error) {
+	d.Log(sql, args...)
+	if tx != nil {
+		if result, err := tx.Exec(sql, args...); err != nil {
+			result, err = nil, errors.Wrap(err, "unable to execute SQL")
+		}
+		return
+	}
+
+	if result, err = d.DB.Exec(sql, args...); err != nil {
+		result, err = nil, errors.Wrap(err, "unable to execute SQL")
+	}
+	return
+}
+
+func (d *CommonDB) QuerySql(tx *sql.Tx, sql string, args ...any) (result *sql.Rows, err error) {
+	d.Log(sql, args...)
+	if tx != nil {
+		if result, err := tx.Query(sql, args...); err != nil {
+			result, err =  nil, errors.Wrap(err, "unable to execute SQL")
+		}
+		return
+	}
+
+	if result, err = d.DB.Query(sql, args...); err != nil {
+		result, err = nil, errors.Wrap(err, "unable to execute SQL")
+	}
+	return
 }
