@@ -97,3 +97,12 @@ func (d *CommonDB) CommitTransaction(tx *sql.Tx) (err error) {
 
 	return nil
 }
+
+func (d *CommonDB) IsEmpty() (bool, error) {
+	settings, err := d.GetSettingsById(nil, 1)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to check if database is empty")
+	}
+
+	return settings == nil, nil
+}
