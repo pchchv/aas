@@ -67,3 +67,7 @@ func (d *MySQLDB) BeginTransaction() (*sql.Tx, error) {
 func (d *MySQLDB) CommitTransaction(tx *sql.Tx) error {
 	return d.CommonDB.CommitTransaction(tx)
 }
+
+func (d *MySQLDB) RollbackTransaction(tx *sql.Tx) error {
+	return d.CommonDB.RollbackTransaction(tx)
+}
