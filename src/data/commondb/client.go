@@ -104,6 +104,22 @@ func (d *CommonDB) GetAllClients(tx *sql.Tx) (clients []models.Client, err error
 	return
 }
 
+func (d *CommonDB) GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error) {
+	clientStruct := sqlbuilder.NewStruct(new(models.Client)).For(d.Flavor)
+	selectBuilder := clientStruct.SelectFrom("clients")
+	selectBuilder.Where(selectBuilder.Equal("id", clientId))
+
+	return d.getClientCommon(tx, selectBuilder, clientStruct)
+}
+
+func (d *CommonDB) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error) {
+	clientStruct := sqlbuilder.NewStruct(new(models.Client)).For(d.Flavor)
+	selectBuilder := clientStruct.SelectFrom("clients")
+	selectBuilder.Where(selectBuilder.Equal("client_identifier", clientIdentifier))
+
+	return d.getClientCommon(tx, selectBuilder, clientStruct)
+}
+
 func (d *CommonDB) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, clientStruct *sqlbuilder.Struct) (*models.Client, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
