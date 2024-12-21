@@ -59,3 +59,11 @@ func NewMySQLDB() (*MySQLDB, error) {
 
 	return &mysqlDb, nil
 }
+
+func (d *MySQLDB) BeginTransaction() (*sql.Tx, error) {
+	return d.CommonDB.BeginTransaction()
+}
+
+func (d *MySQLDB) CommitTransaction(tx *sql.Tx) error {
+	return d.CommonDB.CommitTransaction(tx)
+}
