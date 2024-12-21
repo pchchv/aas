@@ -35,3 +35,22 @@ func (d *CommonDB) CreateClient(tx *sql.Tx, client *models.Client) error {
 	client.Id = id
 	return nil
 }
+
+func (d *CommonDB) UpdateClient(tx *sql.Tx, client *models.Client) (err error) {
+	if client.Id == 0 {
+		return errors.WithStack(errors.New("can't update client with id 0"))
+	}
+
+	originalUpdatedAt := client.UpdatedAt
+	client.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	clientStruct := sqlbuilder.NewStruct(new(models.Client)).For(d.Flavor)
+	updateBuilder := clientStruct.WithoutTag("pk").WithoutTag("dont-update").Update("clients", client)
+	updateBuilder.Where(updateBuilder.Equal("id", client.Id))
+	sql, args := updateBuilder.Build()
+	if _, err = d.ExecSql(tx, sql, args...); err != nil {
+		client.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update client")
+	}
+
+	return nil
+}
