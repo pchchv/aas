@@ -101,6 +101,25 @@ func (d *CommonDB) GetResourceByResourceIdentifier(tx *sql.Tx, resourceIdentifie
 	return d.getResourceCommon(tx, selectBuilder, resourceStruct)
 }
 
+func (d *CommonDB) UpdateResource(tx *sql.Tx, resource *models.Resource) error {
+	if resource.Id == 0 {
+		return errors.WithStack(errors.New("can't update resource with id 0"))
+	}
+
+	originalUpdatedAt := resource.UpdatedAt
+	resource.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).For(d.Flavor)
+	updateBuilder := resourceStruct.WithoutTag("pk").WithoutTag("dont-update").Update("resources", resource)
+	updateBuilder.Where(updateBuilder.Equal("id", resource.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		resource.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update resource")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, resourceStruct *sqlbuilder.Struct) (*models.Resource, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
