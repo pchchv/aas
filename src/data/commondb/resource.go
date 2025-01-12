@@ -120,6 +120,18 @@ func (d *CommonDB) UpdateResource(tx *sql.Tx, resource *models.Resource) error {
 	return nil
 }
 
+func (d *CommonDB) DeleteResource(tx *sql.Tx, resourceId int64) error {
+	clientStruct := sqlbuilder.NewStruct(new(models.Resource)).For(d.Flavor)
+	deleteBuilder := clientStruct.DeleteFrom("resources")
+	deleteBuilder.Where(deleteBuilder.Equal("id", resourceId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete resource")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, resourceStruct *sqlbuilder.Struct) (*models.Resource, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
