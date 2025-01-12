@@ -83,6 +83,25 @@ func (d *CommonDB) GetClientPermissionByClientIdAndPermissionId(tx *sql.Tx, clie
 	return d.getClientPermissionCommon(tx, selectBuilder, clientPermissionStruct)
 }
 
+func (d *CommonDB) UpdateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error {
+	if clientPermission.Id == 0 {
+		return errors.WithStack(errors.New("can't update clientPermission with id 0"))
+	}
+
+	originalUpdatedAt := clientPermission.UpdatedAt
+	clientPermission.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	clientPermissionStruct := sqlbuilder.NewStruct(new(models.ClientPermission)).For(d.Flavor)
+	updateBuilder := clientPermissionStruct.WithoutTag("pk").WithoutTag("dont-update").Update("clients_permissions", clientPermission)
+	updateBuilder.Where(updateBuilder.Equal("id", clientPermission.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		clientPermission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update clientPermission")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, clientPermissionStruct *sqlbuilder.Struct) (*models.ClientPermission, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
