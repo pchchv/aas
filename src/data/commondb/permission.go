@@ -130,6 +130,33 @@ func (d *CommonDB) DeletePermission(tx *sql.Tx, permissionId int64) error {
 	return nil
 }
 
+func (d *CommonDB) PermissionsLoadResources(tx *sql.Tx, permissions []models.Permission) error {
+	if permissions == nil {
+		return nil
+	}
+
+	resourceIds := make([]int64, 0, len(permissions))
+	for _, permission := range permissions {
+		resourceIds = append(resourceIds, permission.ResourceId)
+	}
+
+	resources, err := d.GetResourcesByIds(tx, resourceIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to get resources for permissions")
+	}
+
+	resourceMap := make(map[int64]models.Resource, len(resources))
+	for _, resource := range resources {
+		resourceMap[resource.Id] = resource
+	}
+
+	for i := range permissions {
+		permissions[i].Resource = resourceMap[permissions[i].ResourceId]
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, permissionStruct *sqlbuilder.Struct) (*models.Permission, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
