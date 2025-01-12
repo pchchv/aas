@@ -99,6 +99,25 @@ func (d *CommonDB) GetPermissionById(tx *sql.Tx, permissionId int64) (*models.Pe
 	return d.getPermissionCommon(tx, selectBuilder, permissionStruct)
 }
 
+func (d *CommonDB) UpdatePermission(tx *sql.Tx, permission *models.Permission) error {
+	if permission.Id == 0 {
+		return errors.WithStack(errors.New("can't update permission with id 0"))
+	}
+
+	originalUpdatedAt := permission.UpdatedAt
+	permission.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	permissionStruct := sqlbuilder.NewStruct(new(models.Permission)).For(d.Flavor)
+	updateBuilder := permissionStruct.WithoutTag("pk").WithoutTag("dont-update").Update("permissions", permission)
+	updateBuilder.Where(updateBuilder.Equal("id", permission.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		permission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update permission")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, permissionStruct *sqlbuilder.Struct) (*models.Permission, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
