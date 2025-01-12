@@ -87,6 +87,20 @@ func (d *CommonDB) GetAllResources(tx *sql.Tx) (resources []models.Resource, err
 	return resources, nil
 }
 
+func (d *CommonDB) GetResourceById(tx *sql.Tx, resourceId int64) (*models.Resource, error) {
+	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).For(d.Flavor)
+	selectBuilder := resourceStruct.SelectFrom("resources")
+	selectBuilder.Where(selectBuilder.Equal("id", resourceId))
+	return d.getResourceCommon(tx, selectBuilder, resourceStruct)
+}
+
+func (d *CommonDB) GetResourceByResourceIdentifier(tx *sql.Tx, resourceIdentifier string) (*models.Resource, error) {
+	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).For(d.Flavor)
+	selectBuilder := resourceStruct.SelectFrom("resources")
+	selectBuilder.Where(selectBuilder.Equal("resource_identifier", resourceIdentifier))
+	return d.getResourceCommon(tx, selectBuilder, resourceStruct)
+}
+
 func (d *CommonDB) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, resourceStruct *sqlbuilder.Struct) (*models.Resource, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
