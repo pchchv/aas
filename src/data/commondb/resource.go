@@ -86,3 +86,24 @@ func (d *CommonDB) GetAllResources(tx *sql.Tx) (resources []models.Resource, err
 
 	return resources, nil
 }
+
+func (d *CommonDB) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, resourceStruct *sqlbuilder.Struct) (*models.Resource, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var resource models.Resource
+	if rows.Next() {
+		addr := resourceStruct.Addr(&resource)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan resource")
+		}
+		return &resource, nil
+	}
+
+	return nil, nil
+}
