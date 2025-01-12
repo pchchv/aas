@@ -43,3 +43,24 @@ func (d *CommonDB) CreateClientPermission(tx *sql.Tx, clientPermission *models.C
 
 	return nil
 }
+
+func (d *CommonDB) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, clientPermissionStruct *sqlbuilder.Struct) (*models.ClientPermission, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var clientPermission models.ClientPermission
+	if rows.Next() {
+		addr := clientPermissionStruct.Addr(&clientPermission)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan clientPermission")
+		}
+		return &clientPermission, nil
+	}
+
+	return nil, nil
+}
