@@ -44,6 +44,37 @@ func (d *CommonDB) CreateClientPermission(tx *sql.Tx, clientPermission *models.C
 	return nil
 }
 
+func (d *CommonDB) GetClientPermissionById(tx *sql.Tx, clientPermissionId int64) (*models.ClientPermission, error) {
+	clientPermissionStruct := sqlbuilder.NewStruct(new(models.ClientPermission)).For(d.Flavor)
+	selectBuilder := clientPermissionStruct.SelectFrom("clients_permissions")
+	selectBuilder.Where(selectBuilder.Equal("id", clientPermissionId))
+	return d.getClientPermissionCommon(tx, selectBuilder, clientPermissionStruct)
+}
+
+func (d *CommonDB) GetClientPermissionsByClientId(tx *sql.Tx, clientId int64) (clientPermissions []models.ClientPermission, err error) {
+	clientPermissionStruct := sqlbuilder.NewStruct(new(models.ClientPermission)).For(d.Flavor)
+	selectBuilder := clientPermissionStruct.SelectFrom("clients_permissions")
+	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var clientPermission models.ClientPermission
+		addr := clientPermissionStruct.Addr(&clientPermission)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan clientPermission")
+		}
+
+		clientPermissions = append(clientPermissions, clientPermission)
+	}
+
+	return clientPermissions, nil
+}
+
 func (d *CommonDB) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, clientPermissionStruct *sqlbuilder.Struct) (*models.ClientPermission, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
