@@ -92,6 +92,13 @@ func (d *CommonDB) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) (permi
 	return permissions, nil
 }
 
+func (d *CommonDB) GetPermissionById(tx *sql.Tx, permissionId int64) (*models.Permission, error) {
+	permissionStruct := sqlbuilder.NewStruct(new(models.Permission)).For(d.Flavor)
+	selectBuilder := permissionStruct.SelectFrom("permissions")
+	selectBuilder.Where(selectBuilder.Equal("id", permissionId))
+	return d.getPermissionCommon(tx, selectBuilder, permissionStruct)
+}
+
 func (d *CommonDB) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, permissionStruct *sqlbuilder.Struct) (*models.Permission, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
