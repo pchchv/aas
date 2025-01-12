@@ -91,3 +91,24 @@ func (d *CommonDB) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) (permi
 
 	return permissions, nil
 }
+
+func (d *CommonDB) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, permissionStruct *sqlbuilder.Struct) (*models.Permission, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var permission models.Permission
+	if rows.Next() {
+		addr := permissionStruct.Addr(&permission)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan permission")
+		}
+
+		return &permission, nil
+	}
+
+	return nil, nil
+}
