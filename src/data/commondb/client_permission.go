@@ -75,6 +75,14 @@ func (d *CommonDB) GetClientPermissionsByClientId(tx *sql.Tx, clientId int64) (c
 	return clientPermissions, nil
 }
 
+func (d *CommonDB) GetClientPermissionByClientIdAndPermissionId(tx *sql.Tx, clientId, permissionId int64) (*models.ClientPermission, error) {
+	clientPermissionStruct := sqlbuilder.NewStruct(new(models.ClientPermission)).For(d.Flavor)
+	selectBuilder := clientPermissionStruct.SelectFrom("clients_permissions")
+	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
+	selectBuilder.Where(selectBuilder.Equal("permission_id", permissionId))
+	return d.getClientPermissionCommon(tx, selectBuilder, clientPermissionStruct)
+}
+
 func (d *CommonDB) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, clientPermissionStruct *sqlbuilder.Struct) (*models.ClientPermission, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
