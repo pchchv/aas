@@ -118,6 +118,18 @@ func (d *CommonDB) UpdatePermission(tx *sql.Tx, permission *models.Permission) e
 	return nil
 }
 
+func (d *CommonDB) DeletePermission(tx *sql.Tx, permissionId int64) error {
+	clientStruct := sqlbuilder.NewStruct(new(models.Permission)).For(d.Flavor)
+	deleteBuilder := clientStruct.DeleteFrom("permissions")
+	deleteBuilder.Where(deleteBuilder.Equal("id", permissionId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete permission")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, permissionStruct *sqlbuilder.Struct) (*models.Permission, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
