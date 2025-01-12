@@ -132,6 +132,26 @@ func (d *CommonDB) DeleteClient(tx *sql.Tx, clientId int64) error {
 	return nil
 }
 
+func (d *CommonDB) ClientLoadPermissions(tx *sql.Tx, client *models.Client) error {
+	if client != nil {
+		clientPermissions, err := d.GetClientPermissionsByClientId(tx, client.Id)
+		if err != nil {
+			return err
+		}
+
+		permissionIds := make([]int64, 0)
+		for _, clientPermission := range clientPermissions {
+			permissionIds = append(permissionIds, clientPermission.PermissionId)
+		}
+
+		if client.Permissions, err = d.GetPermissionsByIds(nil, permissionIds); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, clientStruct *sqlbuilder.Struct) (*models.Client, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
