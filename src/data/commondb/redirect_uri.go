@@ -71,3 +71,24 @@ func (d *CommonDB) DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) error {
 
 	return nil
 }
+
+func (d *CommonDB) getRedirectURICommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, redirectURIStruct *sqlbuilder.Struct) (*models.RedirectURI, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var redirectURI models.RedirectURI
+	if rows.Next() {
+		addr := redirectURIStruct.Addr(&redirectURI)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan redirectURI")
+		}
+		return &redirectURI, nil
+	}
+
+	return nil, nil
+}
