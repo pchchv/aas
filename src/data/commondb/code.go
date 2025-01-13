@@ -51,11 +51,31 @@ func (d *CommonDB) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*m
 	selectBuilder.Where(selectBuilder.Equal("used", used))
 	return d.getCodeCommon(tx, selectBuilder, codeStruct)
 }
+
 func (d *CommonDB) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error) {
 	codeStruct := sqlbuilder.NewStruct(new(models.Code)).For(d.Flavor)
 	selectBuilder := codeStruct.SelectFrom("codes")
 	selectBuilder.Where(selectBuilder.Equal("id", codeId))
 	return d.getCodeCommon(tx, selectBuilder, codeStruct)
+}
+
+func (d *CommonDB) UpdateCode(tx *sql.Tx, code *models.Code) error {
+	if code.Id == 0 {
+		return errors.WithStack(errors.New("can't update code with id 0"))
+	}
+
+	originalUpdatedAt := code.UpdatedAt
+	code.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	codeStruct := sqlbuilder.NewStruct(new(models.Code)).For(d.Flavor)
+	updateBuilder := codeStruct.WithoutTag("pk").WithoutTag("dont-update").Update("codes", code)
+	updateBuilder.Where(updateBuilder.Equal("id", code.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		code.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update code")
+	}
+
+	return nil
 }
 
 func (d *CommonDB) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, codeStruct *sqlbuilder.Struct) (*models.Code, error) {
