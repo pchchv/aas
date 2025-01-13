@@ -60,6 +60,13 @@ func (d *CommonDB) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) (redire
 	return
 }
 
+func (d *CommonDB) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*models.RedirectURI, error) {
+	redirectURIStruct := sqlbuilder.NewStruct(new(models.RedirectURI)).For(d.Flavor)
+	selectBuilder := redirectURIStruct.SelectFrom("redirect_uris")
+	selectBuilder.Where(selectBuilder.Equal("id", redirectURIId))
+	return d.getRedirectURICommon(tx, selectBuilder, redirectURIStruct)
+}
+
 func (d *CommonDB) DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) error {
 	clientStruct := sqlbuilder.NewStruct(new(models.RedirectURI)).For(d.Flavor)
 	deleteBuilder := clientStruct.DeleteFrom("redirect_uris")
