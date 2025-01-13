@@ -35,3 +35,26 @@ func (d *CommonDB) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin) erro
 	webOrigin.Id = id
 	return nil
 }
+
+func (d *CommonDB) GetAllWebOrigins(tx *sql.Tx) (webOrigins []models.WebOrigin, err error) {
+	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).For(d.Flavor)
+	selectBuilder := webOriginStruct.SelectFrom("web_origins")
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var webOrigin models.WebOrigin
+		addr := webOriginStruct.Addr(&webOrigin)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan webOrigin")
+		}
+
+		webOrigins = append(webOrigins, webOrigin)
+	}
+
+	return
+}
