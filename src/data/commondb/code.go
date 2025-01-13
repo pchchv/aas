@@ -98,3 +98,23 @@ func (d *CommonDB) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBui
 
 	return nil, nil
 }
+
+func (d *CommonDB) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx) error {
+	deleteBuilder := d.Flavor.NewDeleteBuilder()
+	deleteBuilder.DeleteFrom("codes")
+	deleteBuilder.Where(
+		deleteBuilder.And(
+			deleteBuilder.Equal("used", true),
+			deleteBuilder.NotIn("id",
+				d.Flavor.NewSelectBuilder().Select("code_id").From("refresh_tokens"),
+			),
+		),
+	)
+
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete used codes without refresh tokens")
+	}
+
+	return nil
+}
