@@ -152,6 +152,16 @@ func (d *CommonDB) ClientLoadPermissions(tx *sql.Tx, client *models.Client) erro
 	return nil
 }
 
+func (d *CommonDB) ClientLoadWebOrigins(tx *sql.Tx, client *models.Client) (err error) {
+	if client != nil {
+		if client.WebOrigins, err = d.GetWebOriginsByClientId(tx, client.Id); err != nil {
+			return errors.Wrap(err, "unable to get web origins")
+		}
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, clientStruct *sqlbuilder.Struct) (*models.Client, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
