@@ -58,3 +58,24 @@ func (d *CommonDB) GetAllWebOrigins(tx *sql.Tx) (webOrigins []models.WebOrigin, 
 
 	return
 }
+
+func (d *CommonDB) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, webOriginStruct *sqlbuilder.Struct) (*models.WebOrigin, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var webOrigin models.WebOrigin
+	if rows.Next() {
+		addr := webOriginStruct.Addr(&webOrigin)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan webOrigin")
+		}
+
+		return &webOrigin, nil
+	}
+
+	return nil, nil
+}
