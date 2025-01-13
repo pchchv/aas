@@ -90,6 +90,17 @@ func (d *CommonDB) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) (webOrigi
 	return
 }
 
+func (d *CommonDB) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
+	clientStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).For(d.Flavor)
+	deleteBuilder := clientStruct.DeleteFrom("web_origins")
+	deleteBuilder.Where(deleteBuilder.Equal("id", webOriginId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete webOrigin")
+	}
+	return nil
+}
+
 func (d *CommonDB) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, webOriginStruct *sqlbuilder.Struct) (*models.WebOrigin, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
