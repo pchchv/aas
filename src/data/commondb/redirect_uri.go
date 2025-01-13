@@ -59,3 +59,15 @@ func (d *CommonDB) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) (redire
 
 	return
 }
+
+func (d *CommonDB) DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) error {
+	clientStruct := sqlbuilder.NewStruct(new(models.RedirectURI)).For(d.Flavor)
+	deleteBuilder := clientStruct.DeleteFrom("redirect_uris")
+	deleteBuilder.Where(deleteBuilder.Equal("id", redirectURIId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete redirectURI")
+	}
+
+	return nil
+}
