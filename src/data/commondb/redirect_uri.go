@@ -35,3 +35,27 @@ func (d *CommonDB) CreateRedirectURI(tx *sql.Tx, redirectURI *models.RedirectURI
 	redirectURI.Id = id
 	return nil
 }
+
+func (d *CommonDB) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) (redirectURIs []models.RedirectURI, err error) {
+	redirectURIStruct := sqlbuilder.NewStruct(new(models.RedirectURI)).For(d.Flavor)
+	selectBuilder := redirectURIStruct.SelectFrom("redirect_uris")
+	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var redirectURI models.RedirectURI
+		addr := redirectURIStruct.Addr(&redirectURI)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan redirectURI")
+		}
+		redirectURIs = append(redirectURIs, redirectURI)
+	}
+
+	return
+}
