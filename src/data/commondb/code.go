@@ -44,6 +44,20 @@ func (d *CommonDB) CreateCode(tx *sql.Tx, code *models.Code) error {
 	return nil
 }
 
+func (d *CommonDB) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*models.Code, error) {
+	codeStruct := sqlbuilder.NewStruct(new(models.Code)).For(d.Flavor)
+	selectBuilder := codeStruct.SelectFrom("codes")
+	selectBuilder.Where(selectBuilder.Equal("code_hash", codeHash))
+	selectBuilder.Where(selectBuilder.Equal("used", used))
+	return d.getCodeCommon(tx, selectBuilder, codeStruct)
+}
+func (d *CommonDB) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error) {
+	codeStruct := sqlbuilder.NewStruct(new(models.Code)).For(d.Flavor)
+	selectBuilder := codeStruct.SelectFrom("codes")
+	selectBuilder.Where(selectBuilder.Equal("id", codeId))
+	return d.getCodeCommon(tx, selectBuilder, codeStruct)
+}
+
 func (d *CommonDB) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, codeStruct *sqlbuilder.Struct) (*models.Code, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
