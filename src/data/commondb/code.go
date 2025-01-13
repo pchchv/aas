@@ -43,3 +43,24 @@ func (d *CommonDB) CreateCode(tx *sql.Tx, code *models.Code) error {
 	code.Id = id
 	return nil
 }
+
+func (d *CommonDB) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, codeStruct *sqlbuilder.Struct) (*models.Code, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var code models.Code
+	if rows.Next() {
+		addr := codeStruct.Addr(&code)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan code")
+		}
+		return &code, nil
+	}
+
+	return nil, nil
+}
