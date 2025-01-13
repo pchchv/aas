@@ -162,6 +162,16 @@ func (d *CommonDB) ClientLoadWebOrigins(tx *sql.Tx, client *models.Client) (err 
 	return nil
 }
 
+func (d *CommonDB) ClientLoadRedirectURIs(tx *sql.Tx, client *models.Client) (err error) {
+	if client != nil {
+		if client.RedirectURIs, err = d.GetRedirectURIsByClientId(tx, client.Id); err != nil {
+			return errors.Wrap(err, "unable to get redirect URIs")
+		}
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, clientStruct *sqlbuilder.Struct) (*models.Client, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
