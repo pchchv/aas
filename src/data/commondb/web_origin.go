@@ -59,6 +59,37 @@ func (d *CommonDB) GetAllWebOrigins(tx *sql.Tx) (webOrigins []models.WebOrigin, 
 	return
 }
 
+func (d *CommonDB) GetWebOriginById(tx *sql.Tx, webOriginId int64) (*models.WebOrigin, error) {
+	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).For(d.Flavor)
+	selectBuilder := webOriginStruct.SelectFrom("web_origins")
+	selectBuilder.Where(selectBuilder.Equal("id", webOriginId))
+	return d.getWebOriginCommon(tx, selectBuilder, webOriginStruct)
+}
+
+func (d *CommonDB) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) (webOrigins []models.WebOrigin, err error) {
+	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).For(d.Flavor)
+	selectBuilder := webOriginStruct.SelectFrom("web_origins")
+	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var webOrigin models.WebOrigin
+		addr := webOriginStruct.Addr(&webOrigin)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan webOrigin")
+		}
+
+		webOrigins = append(webOrigins, webOrigin)
+	}
+
+	return
+}
+
 func (d *CommonDB) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, webOriginStruct *sqlbuilder.Struct) (*models.WebOrigin, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
