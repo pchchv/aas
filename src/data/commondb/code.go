@@ -118,3 +118,15 @@ func (d *CommonDB) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx) error {
 
 	return nil
 }
+
+func (d *CommonDB) DeleteCode(tx *sql.Tx, codeId int64) error {
+	clientStruct := sqlbuilder.NewStruct(new(models.Code)).For(d.Flavor)
+	deleteBuilder := clientStruct.DeleteFrom("codes")
+	deleteBuilder.Where(deleteBuilder.Equal("id", codeId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete code")
+	}
+
+	return nil
+}
