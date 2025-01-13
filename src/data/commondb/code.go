@@ -119,6 +119,18 @@ func (d *CommonDB) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx) error {
 	return nil
 }
 
+func (d *CommonDB) CodeLoadClient(tx *sql.Tx, code *models.Code) error {
+	if code != nil {
+		if client, err := d.GetClientById(tx, code.ClientId); err != nil {
+			return errors.Wrap(err, "unable to load client")
+		} else if client != nil {
+			code.Client = *client
+		}
+	}
+
+	return nil
+}
+
 func (d *CommonDB) DeleteCode(tx *sql.Tx, codeId int64) error {
 	clientStruct := sqlbuilder.NewStruct(new(models.Code)).For(d.Flavor)
 	deleteBuilder := clientStruct.DeleteFrom("codes")
