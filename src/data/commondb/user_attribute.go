@@ -39,3 +39,27 @@ func (d *CommonDB) CreateUserAttribute(tx *sql.Tx, userAttribute *models.UserAtt
 	userAttribute.Id = id
 	return nil
 }
+
+func (d *CommonDB) GetUserAttributesByUserId(tx *sql.Tx, userId int64) (userAttributes []models.UserAttribute, err error) {
+	userAttributeStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).For(d.Flavor)
+	selectBuilder := userAttributeStruct.SelectFrom("user_attributes")
+	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userAttribute models.UserAttribute
+		addr := userAttributeStruct.Addr(&userAttribute)
+		err = rows.Scan(addr...)
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to scan userAttribute")
+		}
+		userAttributes = append(userAttributes, userAttribute)
+	}
+
+	return
+}
