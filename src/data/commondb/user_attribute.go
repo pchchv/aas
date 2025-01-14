@@ -63,3 +63,23 @@ func (d *CommonDB) GetUserAttributesByUserId(tx *sql.Tx, userId int64) (userAttr
 
 	return
 }
+
+func (d *CommonDB) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userAttributeStruct *sqlbuilder.Struct) (*models.UserAttribute, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userAttribute models.UserAttribute
+	if rows.Next() {
+		addr := userAttributeStruct.Addr(&userAttribute)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan userAttribute")
+		}
+		return &userAttribute, nil
+	}
+
+	return nil, nil
+}
