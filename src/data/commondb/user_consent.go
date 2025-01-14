@@ -86,6 +86,21 @@ func (d *CommonDB) GetConsentsByUserId(tx *sql.Tx, userId int64) (userConsents [
 	return
 }
 
+func (d *CommonDB) GetConsentByUserIdAndClientId(tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error) {
+	userConsentStruct := sqlbuilder.NewStruct(new(models.UserConsent)).For(d.Flavor)
+	selectBuilder := userConsentStruct.SelectFrom("user_consents")
+	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
+	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
+	return d.getUserConsentCommon(tx, selectBuilder, userConsentStruct)
+}
+
+func (d *CommonDB) GetUserConsentById(tx *sql.Tx, userConsentId int64) (*models.UserConsent, error) {
+	userConsentStruct := sqlbuilder.NewStruct(new(models.UserConsent)).For(d.Flavor)
+	selectBuilder := userConsentStruct.SelectFrom("user_consents")
+	selectBuilder.Where(selectBuilder.Equal("id", userConsentId))
+	return d.getUserConsentCommon(tx, selectBuilder, userConsentStruct)
+}
+
 func (d *CommonDB) getUserConsentCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userConsentStruct *sqlbuilder.Struct) (*models.UserConsent, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
