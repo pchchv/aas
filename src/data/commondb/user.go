@@ -120,6 +120,18 @@ func (d *CommonDB) UpdateUser(tx *sql.Tx, user *models.User) error {
 	return nil
 }
 
+func (d *CommonDB) DeleteUser(tx *sql.Tx, userId int64) error {
+	userStruct := sqlbuilder.NewStruct(new(models.UserSession)).For(d.Flavor)
+	deleteBuilder := userStruct.DeleteFrom("users")
+	deleteBuilder.Where(deleteBuilder.Equal("id", userId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete user")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userStruct *sqlbuilder.Struct) (*models.User, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
