@@ -71,6 +71,25 @@ func (d *CommonDB) GetUserAttributeById(tx *sql.Tx, userAttributeId int64) (*mod
 	return d.getUserAttributeCommon(tx, selectBuilder, userAttributeStruct)
 }
 
+func (d *CommonDB) UpdateUserAttribute(tx *sql.Tx, userAttribute *models.UserAttribute) error {
+	if userAttribute.Id == 0 {
+		return errors.WithStack(errors.New("can't update userAttribute with id 0"))
+	}
+
+	originalUpdatedAt := userAttribute.UpdatedAt
+	userAttribute.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	userAttributeStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).For(d.Flavor)
+	updateBuilder := userAttributeStruct.WithoutTag("pk").WithoutTag("dont-update").Update("user_attributes", userAttribute)
+	updateBuilder.Where(updateBuilder.Equal("id", userAttribute.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		userAttribute.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update userAttribute")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userAttributeStruct *sqlbuilder.Struct) (*models.UserAttribute, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
