@@ -101,6 +101,29 @@ func (d *CommonDB) GetUserConsentById(tx *sql.Tx, userConsentId int64) (*models.
 	return d.getUserConsentCommon(tx, selectBuilder, userConsentStruct)
 }
 
+func (d *CommonDB) DeleteUserConsent(tx *sql.Tx, userConsentId int64) error {
+	userConsentStruct := sqlbuilder.NewStruct(new(models.UserConsent)).For(d.Flavor)
+	deleteBuilder := userConsentStruct.DeleteFrom("user_consents")
+	deleteBuilder.Where(deleteBuilder.Equal("id", userConsentId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete userConsent")
+	}
+
+	return nil
+}
+
+func (d *CommonDB) DeleteAllUserConsent(tx *sql.Tx) error {
+	userConsentStruct := sqlbuilder.NewStruct(new(models.UserConsent)).For(d.Flavor)
+	deleteBuilder := userConsentStruct.DeleteFrom("user_consents")
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete userConsent")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserConsentCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userConsentStruct *sqlbuilder.Struct) (*models.UserConsent, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
