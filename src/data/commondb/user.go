@@ -101,6 +101,25 @@ func (d *CommonDB) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*m
 	return d.getUserCommon(tx, selectBuilder, userStruct)
 }
 
+func (d *CommonDB) UpdateUser(tx *sql.Tx, user *models.User) error {
+	if user.Id == 0 {
+		return errors.WithStack(errors.New("can't update user with id 0"))
+	}
+
+	originalUpdatedAt := user.UpdatedAt
+	user.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	userStruct := sqlbuilder.NewStruct(new(models.User)).For(d.Flavor)
+	updateBuilder := userStruct.WithoutTag("pk").WithoutTag("dont-update").Update("users", user)
+	updateBuilder.Where(updateBuilder.Equal("id", user.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		user.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update user")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userStruct *sqlbuilder.Struct) (*models.User, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
