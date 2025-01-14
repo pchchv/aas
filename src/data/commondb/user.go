@@ -66,6 +66,20 @@ func (d *CommonDB) GetUsersByIds(tx *sql.Tx, userIds []int64) (users map[int64]m
 	return
 }
 
+func (d *CommonDB) GetUserByUsername(tx *sql.Tx, username string) (*models.User, error) {
+	userStruct := sqlbuilder.NewStruct(new(models.User)).For(d.Flavor)
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.Equal("username", username))
+	return d.getUserCommon(tx, selectBuilder, userStruct)
+}
+
+func (d *CommonDB) GetUserBySubject(tx *sql.Tx, subject string) (*models.User, error) {
+	userStruct := sqlbuilder.NewStruct(new(models.User)).For(d.Flavor)
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.Equal("subject", subject))
+	return d.getUserCommon(tx, selectBuilder, userStruct)
+}
+
 func (d *CommonDB) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userStruct *sqlbuilder.Struct) (*models.User, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
