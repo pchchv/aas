@@ -63,6 +63,37 @@ func (d *CommonDB) UpdateUserConsent(tx *sql.Tx, userConsent *models.UserConsent
 	return nil
 }
 
+func (d *CommonDB) UserConsentsLoadClients(tx *sql.Tx, userConsents []models.UserConsent) error {
+	if userConsents == nil {
+		return nil
+	}
+
+	clientIds := make([]int64, len(userConsents))
+	for i, userConsent := range userConsents {
+		clientIds[i] = userConsent.ClientId
+	}
+
+	clients, err := d.GetClientsByIds(tx, clientIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to load clients")
+	}
+
+	clientsById := make(map[int64]models.Client)
+	for _, client := range clients {
+		clientsById[client.Id] = client
+	}
+
+	for i, userConsent := range userConsents {
+		if client, ok := clientsById[userConsent.ClientId]; !ok {
+			return errors.Errorf("unable to find client with id %v", userConsent.ClientId)
+		} else {
+			userConsents[i].Client = client
+		}
+	}
+
+	return nil
+}
+
 func (d *CommonDB) GetConsentsByUserId(tx *sql.Tx, userId int64) (userConsents []models.UserConsent, err error) {
 	userConsentStruct := sqlbuilder.NewStruct(new(models.UserConsent)).For(d.Flavor)
 	selectBuilder := userConsentStruct.SelectFrom("user_consents")
