@@ -43,3 +43,22 @@ func (d *CommonDB) CreateUserConsent(tx *sql.Tx, userConsent *models.UserConsent
 	userConsent.Id = id
 	return nil
 }
+
+func (d *CommonDB) UpdateUserConsent(tx *sql.Tx, userConsent *models.UserConsent) error {
+	if userConsent.Id == 0 {
+		return errors.WithStack(errors.New("can't update userConsent with id 0"))
+	}
+
+	originalUpdatedAt := userConsent.UpdatedAt
+	userConsent.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	userConsentStruct := sqlbuilder.NewStruct(new(models.UserConsent)).For(d.Flavor)
+	updateBuilder := userConsentStruct.WithoutTag("pk").WithoutTag("dont-update").Update("user_consents", userConsent)
+	updateBuilder.Where(updateBuilder.Equal("id", userConsent.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		userConsent.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update userConsent")
+	}
+
+	return nil
+}
