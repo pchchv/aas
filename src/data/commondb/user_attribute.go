@@ -1,0 +1,41 @@
+package commondb
+
+import (
+	"database/sql"
+	"time"
+
+	"github.com/huandu/go-sqlbuilder"
+	"github.com/pchchv/aas/src/models"
+	"github.com/pkg/errors"
+)
+
+func (d *CommonDB) CreateUserAttribute(tx *sql.Tx, userAttribute *models.UserAttribute) error {
+	if userAttribute.UserId == 0 {
+		return errors.WithStack(errors.New("can't create userAttribute with user_id 0"))
+	}
+
+	now := time.Now().UTC()
+	originalCreatedAt := userAttribute.CreatedAt
+	originalUpdatedAt := userAttribute.UpdatedAt
+	userAttribute.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	userAttribute.UpdatedAt = sql.NullTime{Time: now, Valid: true}
+	userAttributeStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).For(d.Flavor)
+	insertBuilder := userAttributeStruct.WithoutTag("pk").InsertInto("user_attributes", userAttribute)
+	sql, args := insertBuilder.Build()
+	result, err := d.ExecSql(tx, sql, args...)
+	if err != nil {
+		userAttribute.CreatedAt = originalCreatedAt
+		userAttribute.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert userAttribute")
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		userAttribute.CreatedAt = originalCreatedAt
+		userAttribute.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to get last insert id")
+	}
+
+	userAttribute.Id = id
+	return nil
+}
