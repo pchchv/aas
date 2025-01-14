@@ -66,6 +66,17 @@ func (d *CommonDB) GetUsersByIds(tx *sql.Tx, userIds []int64) (users map[int64]m
 	return
 }
 
+func (d *CommonDB) UserLoadAttributes(tx *sql.Tx, user *models.User) error {
+	if user != nil {
+		if userAttributes, err := d.GetUserAttributesByUserId(tx, user.Id); err != nil {
+			return err
+		} else {
+			user.Attributes = userAttributes
+		}
+	}
+	return nil
+}
+
 func (d *CommonDB) GetUserByUsername(tx *sql.Tx, username string) (*models.User, error) {
 	userStruct := sqlbuilder.NewStruct(new(models.User)).For(d.Flavor)
 	selectBuilder := userStruct.SelectFrom("users")
