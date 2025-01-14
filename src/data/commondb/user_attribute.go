@@ -90,6 +90,18 @@ func (d *CommonDB) UpdateUserAttribute(tx *sql.Tx, userAttribute *models.UserAtt
 	return nil
 }
 
+func (d *CommonDB) DeleteUserAttribute(tx *sql.Tx, userAttributeId int64) error {
+	clientStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).For(d.Flavor)
+	deleteBuilder := clientStruct.DeleteFrom("user_attributes")
+	deleteBuilder.Where(deleteBuilder.Equal("id", userAttributeId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete userAttribute")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userAttributeStruct *sqlbuilder.Struct) (*models.UserAttribute, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
