@@ -85,3 +85,23 @@ func (d *CommonDB) GetConsentsByUserId(tx *sql.Tx, userId int64) (userConsents [
 
 	return
 }
+
+func (d *CommonDB) getUserConsentCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userConsentStruct *sqlbuilder.Struct) (*models.UserConsent, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userConsent models.UserConsent
+	if rows.Next() {
+		addr := userConsentStruct.Addr(&userConsent)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan userConsent")
+		}
+		return &userConsent, nil
+	}
+
+	return nil, nil
+}
