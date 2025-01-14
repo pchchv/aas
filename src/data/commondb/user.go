@@ -80,6 +80,27 @@ func (d *CommonDB) GetUserBySubject(tx *sql.Tx, subject string) (*models.User, e
 	return d.getUserCommon(tx, selectBuilder, userStruct)
 }
 
+func (d *CommonDB) GetUserByEmail(tx *sql.Tx, email string) (*models.User, error) {
+	userStruct := sqlbuilder.NewStruct(new(models.User)).For(d.Flavor)
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.Equal("email", email))
+	return d.getUserCommon(tx, selectBuilder, userStruct)
+}
+
+func (d *CommonDB) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*models.User, error) {
+	userStruct := sqlbuilder.NewStruct(new(models.User)).For(d.Flavor)
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(
+		selectBuilder.And(
+			selectBuilder.Equal("otp_enabled", otpEnabledState),
+			selectBuilder.Equal("enabled", true),
+		),
+	)
+	selectBuilder.OrderBy("id").Desc()
+	selectBuilder.Limit(1)
+	return d.getUserCommon(tx, selectBuilder, userStruct)
+}
+
 func (d *CommonDB) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userStruct *sqlbuilder.Struct) (*models.User, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
