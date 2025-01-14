@@ -64,6 +64,13 @@ func (d *CommonDB) GetUserAttributesByUserId(tx *sql.Tx, userId int64) (userAttr
 	return
 }
 
+func (d *CommonDB) GetUserAttributeById(tx *sql.Tx, userAttributeId int64) (*models.UserAttribute, error) {
+	userAttributeStruct := sqlbuilder.NewStruct(new(models.UserAttribute)).For(d.Flavor)
+	selectBuilder := userAttributeStruct.SelectFrom("user_attributes")
+	selectBuilder.Where(selectBuilder.Equal("id", userAttributeId))
+	return d.getUserAttributeCommon(tx, selectBuilder, userAttributeStruct)
+}
+
 func (d *CommonDB) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userAttributeStruct *sqlbuilder.Struct) (*models.UserAttribute, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
