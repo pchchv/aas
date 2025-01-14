@@ -120,6 +120,80 @@ func (d *CommonDB) UpdateUser(tx *sql.Tx, user *models.User) error {
 	return nil
 }
 
+func (d *CommonDB) SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) (users []models.User, count int, err error) {
+	if page < 1 {
+		page = 1
+	}
+
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	userStruct := sqlbuilder.NewStruct(new(models.User)).For(d.Flavor)
+	selectBuilder := userStruct.SelectFrom("users")
+	if query != "" {
+		selectBuilder.Where(
+			selectBuilder.Or(
+				selectBuilder.Like("subject", "%"+query+"%"),
+				selectBuilder.Like("username", "%"+query+"%"),
+				selectBuilder.Like("given_name", "%"+query+"%"),
+				selectBuilder.Like("middle_name", "%"+query+"%"),
+				selectBuilder.Like("family_name", "%"+query+"%"),
+				selectBuilder.Like("email", "%"+query+"%"),
+			),
+		)
+	}
+	selectBuilder.OrderBy("users.given_name").Asc()
+	selectBuilder.Offset((page - 1) * pageSize)
+	selectBuilder.Limit(pageSize)
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user models.User
+		addr := userStruct.Addr(&user)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan user")
+		}
+		users = append(users, user)
+	}
+
+	selectBuilder = d.Flavor.NewSelectBuilder()
+	selectBuilder.Select("count(*)").From("users")
+	if query != "" {
+		selectBuilder.Where(
+			selectBuilder.Or(
+				selectBuilder.Like("subject", "%"+query+"%"),
+				selectBuilder.Like("username", "%"+query+"%"),
+				selectBuilder.Like("given_name", "%"+query+"%"),
+				selectBuilder.Like("middle_name", "%"+query+"%"),
+				selectBuilder.Like("family_name", "%"+query+"%"),
+				selectBuilder.Like("email", "%"+query+"%"),
+			),
+		)
+	}
+
+	sql, args = selectBuilder.Build()
+	rows2, err := d.QuerySql(nil, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows2.Close()
+
+	if rows2.Next() {
+		err = rows2.Scan(&count)
+		if err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan count")
+		}
+	}
+
+	return
+}
+
 func (d *CommonDB) DeleteUser(tx *sql.Tx, userId int64) error {
 	userStruct := sqlbuilder.NewStruct(new(models.UserSession)).For(d.Flavor)
 	deleteBuilder := userStruct.DeleteFrom("users")
