@@ -131,6 +131,18 @@ func (d *CommonDB) CodeLoadClient(tx *sql.Tx, code *models.Code) error {
 	return nil
 }
 
+func (d *CommonDB) CodeLoadUser(tx *sql.Tx, code *models.Code) error {
+	if code != nil {
+		if user, err := d.GetUserById(tx, code.UserId); err != nil {
+			return errors.Wrap(err, "unable to load user")
+		} else if user != nil {
+			code.User = *user
+		}
+	}
+
+	return nil
+}
+
 func (d *CommonDB) DeleteCode(tx *sql.Tx, codeId int64) error {
 	clientStruct := sqlbuilder.NewStruct(new(models.Code)).For(d.Flavor)
 	deleteBuilder := clientStruct.DeleteFrom("codes")
