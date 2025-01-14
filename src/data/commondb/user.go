@@ -36,6 +36,36 @@ func (d *CommonDB) CreateUser(tx *sql.Tx, user *models.User) error {
 	return nil
 }
 
+func (d *CommonDB) GetUserById(tx *sql.Tx, userId int64) (*models.User, error) {
+	userStruct := sqlbuilder.NewStruct(new(models.User)).For(d.Flavor)
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.Equal("id", userId))
+	return d.getUserCommon(tx, selectBuilder, userStruct)
+}
+
+func (d *CommonDB) GetUsersByIds(tx *sql.Tx, userIds []int64) (users map[int64]models.User, err error) {
+	userStruct := sqlbuilder.NewStruct(new(models.User)).For(d.Flavor)
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(userIds)...))
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user models.User
+		addr := userStruct.Addr(&user)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan user")
+		}
+		users[user.Id] = user
+	}
+
+	return
+}
+
 func (d *CommonDB) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userStruct *sqlbuilder.Struct) (*models.User, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
