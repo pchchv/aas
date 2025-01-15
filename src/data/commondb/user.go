@@ -77,6 +77,74 @@ func (d *CommonDB) UserLoadAttributes(tx *sql.Tx, user *models.User) error {
 	return nil
 }
 
+func (d *CommonDB) UsersLoadPermissions(tx *sql.Tx, users []models.User) error {
+	if users == nil {
+		return nil
+	}
+
+	userIds := make([]int64, len(users))
+	for i, user := range users {
+		userIds[i] = user.Id
+	}
+
+	userPermissions, err := d.GetUserPermissionsByUserIds(tx, userIds)
+	if err != nil {
+		return err
+	}
+
+	permissionIds := make([]int64, len(userPermissions))
+	for i, userPermission := range userPermissions {
+		permissionIds[i] = userPermission.PermissionId
+	}
+
+	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
+	if err != nil {
+		return err
+	}
+
+	permissionMap := make(map[int64]models.Permission)
+	for _, permission := range permissions {
+		permissionMap[permission.Id] = permission
+	}
+
+	permissionsByUserId := make(map[int64][]models.Permission)
+	for _, userPermission := range userPermissions {
+		if permission, ok := permissionMap[userPermission.PermissionId]; ok {
+			permissionsByUserId[userPermission.UserId] = append(permissionsByUserId[userPermission.UserId], permission)
+		}
+	}
+
+	for i, user := range users {
+		users[i].Permissions = permissionsByUserId[user.Id]
+	}
+
+	return nil
+}
+
+func (d *CommonDB) UserLoadPermissions(tx *sql.Tx, user *models.User) error {
+	if user == nil {
+		return nil
+	}
+
+	userPermissions, err := d.GetUserPermissionsByUserId(tx, user.Id)
+	if err != nil {
+		return err
+	}
+
+	permissionIds := make([]int64, len(userPermissions))
+	for i, userPermission := range userPermissions {
+		permissionIds[i] = userPermission.PermissionId
+	}
+
+	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
+	if err != nil {
+		return err
+	}
+
+	user.Permissions = permissions
+	return nil
+}
+
 func (d *CommonDB) GetUserByUsername(tx *sql.Tx, username string) (*models.User, error) {
 	userStruct := sqlbuilder.NewStruct(new(models.User)).For(d.Flavor)
 	selectBuilder := userStruct.SelectFrom("users")
