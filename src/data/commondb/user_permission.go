@@ -2,11 +2,47 @@ package commondb
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/pchchv/aas/src/models"
 	"github.com/pkg/errors"
 )
+
+func (d *CommonDB) CreateUserPermission(tx *sql.Tx, userPermission *models.UserPermission) error {
+	if userPermission.UserId == 0 {
+		return errors.WithStack(errors.New("can't create userPermission with user_id 0"))
+	}
+
+	if userPermission.PermissionId == 0 {
+		return errors.WithStack(errors.New("can't create userPermission with permission_id 0"))
+	}
+
+	now := time.Now().UTC()
+	originalCreatedAt := userPermission.CreatedAt
+	originalUpdatedAt := userPermission.UpdatedAt
+	userPermission.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	userPermission.UpdatedAt = sql.NullTime{Time: now, Valid: true}
+	userPermissionStruct := sqlbuilder.NewStruct(new(models.UserPermission)).For(d.Flavor)
+	insertBuilder := userPermissionStruct.WithoutTag("pk").InsertInto("users_permissions", userPermission)
+	sql, args := insertBuilder.Build()
+	result, err := d.ExecSql(tx, sql, args...)
+	if err != nil {
+		userPermission.CreatedAt = originalCreatedAt
+		userPermission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert userPermission")
+	}
+
+	if id, err := result.LastInsertId(); err != nil {
+		userPermission.CreatedAt = originalCreatedAt
+		userPermission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to get last insert id")
+	} else {
+		userPermission.Id = id
+	}
+
+	return nil
+}
 
 func (d *CommonDB) GetUserPermissionsByUserIds(tx *sql.Tx, userIds []int64) (userPermissions []models.UserPermission, err error) {
 	if len(userIds) == 0 {
