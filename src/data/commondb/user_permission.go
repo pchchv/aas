@@ -114,3 +114,23 @@ func (d *CommonDB) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId int6
 
 	return
 }
+
+func (d *CommonDB) getUserPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userPermissionStruct *sqlbuilder.Struct) (*models.UserPermission, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userPermission models.UserPermission
+	if rows.Next() {
+		addr := userPermissionStruct.Addr(&userPermission)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan userPermission")
+		}
+		return &userPermission, nil
+	}
+
+	return nil, nil
+}
