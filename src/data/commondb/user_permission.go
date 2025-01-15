@@ -115,6 +115,21 @@ func (d *CommonDB) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId int6
 	return
 }
 
+func (d *CommonDB) GetUserPermissionByUserIdAndPermissionId(tx *sql.Tx, userId, permissionId int64) (*models.UserPermission, error) {
+	userPermissionStruct := sqlbuilder.NewStruct(new(models.UserPermission)).For(d.Flavor)
+	selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
+	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
+	selectBuilder.Where(selectBuilder.Equal("permission_id", permissionId))
+	return d.getUserPermissionCommon(tx, selectBuilder, userPermissionStruct)
+}
+
+func (d *CommonDB) GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*models.UserPermission, error) {
+	userPermissionStruct := sqlbuilder.NewStruct(new(models.UserPermission)).For(d.Flavor)
+	selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
+	selectBuilder.Where(selectBuilder.Equal("id", userPermissionId))
+	return d.getUserPermissionCommon(tx, selectBuilder, userPermissionStruct)
+}
+
 func (d *CommonDB) getUserPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userPermissionStruct *sqlbuilder.Struct) (*models.UserPermission, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
