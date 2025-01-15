@@ -97,3 +97,26 @@ func (d *CommonDB) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64
 
 	return
 }
+
+func (d *CommonDB) GetUserSessionsByUserId(tx *sql.Tx, userId int64) (userSessions []models.UserSession, err error) {
+	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).For(d.Flavor)
+	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
+	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userSession models.UserSession
+		addr := userSessionStruct.Addr(&userSession)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan userSession")
+		}
+		userSessions = append(userSessions, userSession)
+	}
+
+	return
+}
