@@ -170,6 +170,37 @@ func (d *CommonDB) DeleteUserSession(tx *sql.Tx, userSessionId int64) error {
 	return nil
 }
 
+func (d *CommonDB) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
+	deleteBuilder := d.Flavor.NewDeleteBuilder()
+	deleteBuilder.DeleteFrom("user_sessions")
+	deleteBuilder.Where(
+		deleteBuilder.LessThan("last_accessed", time.Now().UTC().Add(-idleTimeout)),
+	)
+
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete idle sessions")
+	}
+
+	return nil
+}
+
+// Deletes user sessions that have existed longer than the specified maximum lifetime
+func (d *CommonDB) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) error {
+	deleteBuilder := d.Flavor.NewDeleteBuilder()
+	deleteBuilder.DeleteFrom("user_sessions")
+	deleteBuilder.Where(
+		deleteBuilder.LessThan("started", time.Now().UTC().Add(-maxLifetime)),
+	)
+
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete expired sessions")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userSessionStruct *sqlbuilder.Struct) (*models.UserSession, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
