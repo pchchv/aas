@@ -128,6 +128,18 @@ func (d *CommonDB) UpdateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) erro
 	return nil
 }
 
+func (d *CommonDB) DeleteUserGroup(tx *sql.Tx, userGroupId int64) error {
+	clientStruct := sqlbuilder.NewStruct(new(models.UserGroup)).For(d.Flavor)
+	deleteBuilder := clientStruct.DeleteFrom("users_groups")
+	deleteBuilder.Where(deleteBuilder.Equal("id", userGroupId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete userGroup")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userGroupStruct *sqlbuilder.Struct) (*models.UserGroup, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
