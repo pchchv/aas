@@ -201,6 +201,49 @@ func (d *CommonDB) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) 
 	return nil
 }
 
+func (d *CommonDB) UserSessionLoadUser(tx *sql.Tx, userSession *models.UserSession) error {
+	if userSession != nil {
+		if user, err := d.GetUserById(tx, userSession.UserId); err != nil {
+			return errors.Wrap(err, "unable to load user")
+		} else if user != nil {
+			userSession.User = *user
+		}
+	}
+
+	return nil
+}
+
+func (d *CommonDB) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models.UserSession) error {
+	if userSessions == nil {
+		return nil
+	}
+
+	userIds := make([]int64, 0, len(userSessions))
+	for _, userSession := range userSessions {
+		userIds = append(userIds, userSession.UserId)
+	}
+
+	users, err := d.GetUsersByIds(tx, userIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to load users")
+	}
+
+	usersById := make(map[int64]models.User)
+	for _, user := range users {
+		usersById[user.Id] = user
+	}
+
+	for i, userSession := range userSessions {
+		if user, ok := usersById[userSession.UserId]; !ok {
+			return errors.Errorf("unable to find user with id %v", userSession.Id)
+		} else {
+			userSessions[i].User = user
+		}
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userSessionStruct *sqlbuilder.Struct) (*models.UserSession, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
