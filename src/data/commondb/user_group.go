@@ -109,6 +109,25 @@ func (d *CommonDB) GetUserGroupById(tx *sql.Tx, userGroupId int64) (*models.User
 	return d.getUserGroupCommon(tx, selectBuilder, userGroupStruct)
 }
 
+func (d *CommonDB) UpdateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) error {
+	if userGroup.Id == 0 {
+		return errors.WithStack(errors.New("can't update userGroup with id 0"))
+	}
+
+	originalUpdatedAt := userGroup.UpdatedAt
+	userGroup.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).For(d.Flavor)
+	updateBuilder := userGroupStruct.WithoutTag("pk").WithoutTag("dont-update").Update("users_groups", userGroup)
+	updateBuilder.Where(updateBuilder.Equal("id", userGroup.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		userGroup.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update userGroup")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userGroupStruct *sqlbuilder.Struct) (*models.UserGroup, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
