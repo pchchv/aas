@@ -139,6 +139,25 @@ func (d *CommonDB) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIdentifi
 	return d.getUserSessionCommon(tx, selectBuilder, userSessionStruct)
 }
 
+func (d *CommonDB) UpdateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
+	if userSession.Id == 0 {
+		return errors.WithStack(errors.New("can't update userSession with id 0"))
+	}
+
+	originalUpdatedAt := userSession.UpdatedAt
+	userSession.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).For(d.Flavor)
+	updateBuilder := userSessionStruct.WithoutTag("pk").WithoutTag("dont-update").Update("user_sessions", userSession)
+	updateBuilder.Where(updateBuilder.Equal("id", userSession.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		userSession.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update userSession")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userSessionStruct *sqlbuilder.Struct) (*models.UserSession, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
