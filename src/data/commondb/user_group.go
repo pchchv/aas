@@ -93,3 +93,23 @@ func (d *CommonDB) GetUserGroupsByUserId(tx *sql.Tx, userId int64) (userGroups [
 
 	return
 }
+
+func (d *CommonDB) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userGroupStruct *sqlbuilder.Struct) (*models.UserGroup, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userGroup models.UserGroup
+	if rows.Next() {
+		addr := userGroupStruct.Addr(&userGroup)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan userGroup")
+		}
+		return &userGroup, nil
+	}
+
+	return nil, nil
+}
