@@ -120,3 +120,23 @@ func (d *CommonDB) GetUserSessionsByUserId(tx *sql.Tx, userId int64) (userSessio
 
 	return
 }
+
+func (d *CommonDB) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userSessionStruct *sqlbuilder.Struct) (*models.UserSession, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userSession models.UserSession
+	if rows.Next() {
+		addr := userSessionStruct.Addr(&userSession)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan userSession")
+		}
+		return &userSession, nil
+	}
+
+	return nil, nil
+}
