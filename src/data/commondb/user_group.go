@@ -94,6 +94,21 @@ func (d *CommonDB) GetUserGroupsByUserId(tx *sql.Tx, userId int64) (userGroups [
 	return
 }
 
+func (d *CommonDB) GetUserGroupByUserIdAndGroupId(tx *sql.Tx, userId, groupId int64) (*models.UserGroup, error) {
+	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).For(d.Flavor)
+	selectBuilder := userGroupStruct.SelectFrom("users_groups")
+	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
+	selectBuilder.Where(selectBuilder.Equal("group_id", groupId))
+	return d.getUserGroupCommon(tx, selectBuilder, userGroupStruct)
+}
+
+func (d *CommonDB) GetUserGroupById(tx *sql.Tx, userGroupId int64) (*models.UserGroup, error) {
+	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).For(d.Flavor)
+	selectBuilder := userGroupStruct.SelectFrom("users_groups")
+	selectBuilder.Where(selectBuilder.Equal("id", userGroupId))
+	return d.getUserGroupCommon(tx, selectBuilder, userGroupStruct)
+}
+
 func (d *CommonDB) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userGroupStruct *sqlbuilder.Struct) (*models.UserGroup, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
