@@ -43,3 +43,30 @@ func (d *CommonDB) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) erro
 	userGroup.Id = id
 	return nil
 }
+
+func (d *CommonDB) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) (userGroups []models.UserGroup, err error) {
+	if len(userIds) == 0 {
+		return nil, nil
+	}
+
+	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).For(d.Flavor)
+	selectBuilder := userGroupStruct.SelectFrom("users_groups")
+	selectBuilder.Where(selectBuilder.In("user_id", sqlbuilder.Flatten(userIds)...))
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userGroup models.UserGroup
+		addr := userGroupStruct.Addr(&userGroup)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan userGroup")
+		}
+		userGroups = append(userGroups, userGroup)
+	}
+
+	return
+}
