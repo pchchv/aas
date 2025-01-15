@@ -121,6 +121,24 @@ func (d *CommonDB) GetUserSessionsByUserId(tx *sql.Tx, userId int64) (userSessio
 	return
 }
 
+func (d *CommonDB) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*models.UserSession, error) {
+	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).For(d.Flavor)
+	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
+	selectBuilder.Where(selectBuilder.Equal("id", userSessionId))
+	return d.getUserSessionCommon(tx, selectBuilder, userSessionStruct)
+}
+
+func (d *CommonDB) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error) {
+	if sessionIdentifier == "" {
+		return nil, nil
+	}
+
+	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).For(d.Flavor)
+	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
+	selectBuilder.Where(selectBuilder.Equal("session_identifier", sessionIdentifier))
+	return d.getUserSessionCommon(tx, selectBuilder, userSessionStruct)
+}
+
 func (d *CommonDB) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userSessionStruct *sqlbuilder.Struct) (*models.UserSession, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
