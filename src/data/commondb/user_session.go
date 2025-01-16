@@ -244,6 +244,33 @@ func (d *CommonDB) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models.UserS
 	return nil
 }
 
+func (d *CommonDB) UserSessionsLoadClients(tx *sql.Tx, userSessions []models.UserSession) error {
+	if userSessions == nil {
+		return nil
+	}
+
+	userSessionIds := make([]int64, 0, len(userSessions))
+	for _, userSession := range userSessions {
+		userSessionIds = append(userSessionIds, userSession.Id)
+	}
+
+	userSessionClients, err := d.GetUserSessionClientsByUserSessionIds(tx, userSessionIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to load userSessionClients")
+	}
+
+	userSessionClientsByUserSessionId := make(map[int64][]models.UserSessionClient)
+	for _, userSessionClient := range userSessionClients {
+		userSessionClientsByUserSessionId[userSessionClient.UserSessionId] = append(userSessionClientsByUserSessionId[userSessionClient.UserSessionId], userSessionClient)
+	}
+
+	for i, userSession := range userSessions {
+		userSessions[i].Clients = userSessionClientsByUserSessionId[userSession.Id]
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userSessionStruct *sqlbuilder.Struct) (*models.UserSession, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
