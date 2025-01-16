@@ -145,6 +145,74 @@ func (d *CommonDB) UserLoadPermissions(tx *sql.Tx, user *models.User) error {
 	return nil
 }
 
+func (d *CommonDB) UsersLoadGroups(tx *sql.Tx, users []models.User) error {
+	if users == nil {
+		return nil
+	}
+
+	userIds := make([]int64, len(users))
+	for i, user := range users {
+		userIds[i] = user.Id
+	}
+
+	userGroups, err := d.GetUserGroupsByUserIds(tx, userIds)
+	if err != nil {
+		return err
+	}
+
+	groupIds := make([]int64, len(userGroups))
+	for i, userGroup := range userGroups {
+		groupIds[i] = userGroup.GroupId
+	}
+
+	groups, err := d.GetGroupsByIds(tx, groupIds)
+	if err != nil {
+		return err
+	}
+
+	groupsByUserId := make(map[int64][]models.Group)
+	for _, userGroup := range userGroups {
+		var group models.Group
+		for _, g := range groups {
+			if g.Id == userGroup.GroupId {
+				group = g
+				break
+			}
+		}
+		groupsByUserId[userGroup.UserId] = append(groupsByUserId[userGroup.UserId], group)
+	}
+
+	for i, user := range users {
+		users[i].Groups = groupsByUserId[user.Id]
+	}
+
+	return nil
+}
+
+func (d *CommonDB) UserLoadGroups(tx *sql.Tx, user *models.User) error {
+	if user == nil {
+		return nil
+	}
+
+	userGroups, err := d.GetUserGroupsByUserId(tx, user.Id)
+	if err != nil {
+		return err
+	}
+
+	groupIds := make([]int64, len(userGroups))
+	for i, group := range userGroups {
+		groupIds[i] = group.GroupId
+	}
+
+	groups, err := d.GetGroupsByIds(tx, groupIds)
+	if err != nil {
+		return err
+	}
+
+	user.Groups = groups
+	return nil
+}
+
 func (d *CommonDB) GetUserByUsername(tx *sql.Tx, username string) (*models.User, error) {
 	userStruct := sqlbuilder.NewStruct(new(models.User)).For(d.Flavor)
 	selectBuilder := userStruct.SelectFrom("users")
