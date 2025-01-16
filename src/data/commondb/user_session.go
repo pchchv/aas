@@ -271,6 +271,18 @@ func (d *CommonDB) UserSessionsLoadClients(tx *sql.Tx, userSessions []models.Use
 	return nil
 }
 
+func (d *CommonDB) UserSessionLoadClients(tx *sql.Tx, userSession *models.UserSession) error {
+	if userSession != nil {
+		if userSessionClients, err := d.GetUserSessionClientsByUserSessionId(tx, userSession.Id); err != nil {
+			return errors.Wrap(err, "unable to load userSessionClients")
+		} else {
+			userSession.Clients = userSessionClients
+		}
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userSessionStruct *sqlbuilder.Struct) (*models.UserSession, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
