@@ -97,6 +97,37 @@ func (d *CommonDB) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*m
 	return d.getGroupAttributeCommon(tx, selectBuilder, groupAttributeStruct)
 }
 
+func (d *CommonDB) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
+	if groupAttribute.Id == 0 {
+		return errors.WithStack(errors.New("can't update groupAttribute with id 0"))
+	}
+
+	originalUpdatedAt := groupAttribute.UpdatedAt
+	groupAttribute.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).For(d.Flavor)
+	updateBuilder := groupAttributeStruct.WithoutTag("pk").WithoutTag("dont-update").Update("group_attributes", groupAttribute)
+	updateBuilder.Where(updateBuilder.Equal("id", groupAttribute.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		groupAttribute.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update groupAttribute")
+	}
+
+	return nil
+}
+
+func (d *CommonDB) DeleteGroupAttribute(tx *sql.Tx, groupAttributeId int64) error {
+	clientStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).For(d.Flavor)
+	deleteBuilder := clientStruct.DeleteFrom("group_attributes")
+	deleteBuilder.Where(deleteBuilder.Equal("id", groupAttributeId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete groupAttribute")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getGroupAttributeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, groupAttributeStruct *sqlbuilder.Struct) (*models.GroupAttribute, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
