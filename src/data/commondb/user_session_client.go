@@ -120,6 +120,26 @@ func (d *CommonDB) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionI
 	return
 }
 
+func (d *CommonDB) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
+	if userSessionClient.Id == 0 {
+		return errors.WithStack(errors.New("can't update userSessionClient with id 0"))
+	}
+
+	originalUpdatedAt := userSessionClient.UpdatedAt
+	userSessionClient.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).For(d.Flavor)
+	updateBuilder := userSessionClientStruct.WithoutTag("pk").WithoutTag("dont-update").Update("user_session_clients", userSessionClient)
+	updateBuilder.Where(updateBuilder.Equal("id", userSessionClient.Id))
+
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		userSessionClient.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update userSessionClient")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userSessionClientStruct *sqlbuilder.Struct) (*models.UserSessionClient, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
