@@ -249,6 +249,18 @@ func (d *CommonDB) CountGroupMembers(tx *sql.Tx, groupId int64) (count int, err 
 	return 0, nil
 }
 
+func (d *CommonDB) DeleteGroup(tx *sql.Tx, groupId int64) error {
+	clientStruct := sqlbuilder.NewStruct(new(models.Group)).For(d.Flavor)
+	deleteBuilder := clientStruct.DeleteFrom(d.Flavor.Quote("groups"))
+	deleteBuilder.Where(deleteBuilder.Equal("id", groupId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete group")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, groupStruct *sqlbuilder.Struct) (*models.Group, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
