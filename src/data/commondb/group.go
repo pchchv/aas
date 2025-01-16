@@ -35,3 +35,23 @@ func (d *CommonDB) CreateGroup(tx *sql.Tx, group *models.Group) error {
 	group.Id = id
 	return nil
 }
+
+func (d *CommonDB) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, groupStruct *sqlbuilder.Struct) (*models.Group, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var group models.Group
+	if rows.Next() {
+		addr := groupStruct.Addr(&group)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan group")
+		}
+		return &group, nil
+	}
+
+	return nil, nil
+}
