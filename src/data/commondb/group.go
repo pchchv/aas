@@ -142,6 +142,69 @@ func (d *CommonDB) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) (gr
 	return
 }
 
+func (d *CommonDB) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, page int, pageSize int) (users []models.User, total int, err error) {
+	if groupId <= 0 {
+		return nil, 0, errors.WithStack(errors.New("group id must be greater than 0"))
+	}
+
+	if page < 1 {
+		page = 1
+	}
+
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	userStruct := sqlbuilder.NewStruct(new(models.User)).For(d.Flavor)
+	selectBuilder := userStruct.SelectFrom("users")
+	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_groups", "users.id = users_groups.user_id")
+	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
+	selectBuilder.OrderBy("users.given_name").Asc()
+	selectBuilder.Offset((page - 1) * pageSize)
+	selectBuilder.Limit(pageSize)
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user models.User
+		addr := userStruct.Addr(&user)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan user")
+		}
+		users = append(users, user)
+	}
+
+	selectBuilder = d.Flavor.NewSelectBuilder()
+	selectBuilder.Select("count(*)").From("users")
+	selectBuilder.JoinWithOption(sqlbuilder.InnerJoin, "users_groups", "users.id = users_groups.user_id")
+	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
+	sql, args = selectBuilder.Build()
+	rows2, err := d.QuerySql(nil, sql, args...)
+	if err != nil {
+		return nil, 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows2.Close()
+
+	if rows2.Next() {
+		if err = rows2.Scan(&total); err != nil {
+			return nil, 0, errors.Wrap(err, "unable to scan count")
+		}
+	}
+
+	return
+}
+
+func (d *CommonDB) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*models.Group, error) {
+	groupStruct := sqlbuilder.NewStruct(new(models.Group)).For(d.Flavor)
+	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
+	selectBuilder.Where(selectBuilder.Equal("group_identifier", groupIdentifier))
+	return d.getGroupCommon(tx, selectBuilder, groupStruct)
+}
+
 func (d *CommonDB) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, groupStruct *sqlbuilder.Struct) (*models.Group, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
