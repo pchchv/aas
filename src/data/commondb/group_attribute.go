@@ -89,3 +89,30 @@ func (d *CommonDB) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) (group
 
 	return
 }
+
+func (d *CommonDB) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*models.GroupAttribute, error) {
+	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).For(d.Flavor)
+	selectBuilder := groupAttributeStruct.SelectFrom("group_attributes")
+	selectBuilder.Where(selectBuilder.Equal("id", groupAttributeId))
+	return d.getGroupAttributeCommon(tx, selectBuilder, groupAttributeStruct)
+}
+
+func (d *CommonDB) getGroupAttributeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, groupAttributeStruct *sqlbuilder.Struct) (*models.GroupAttribute, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var groupAttribute models.GroupAttribute
+	if rows.Next() {
+		addr := groupAttributeStruct.Addr(&groupAttribute)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan groupAttribute")
+		}
+		return &groupAttribute, nil
+	}
+
+	return nil, nil
+}
