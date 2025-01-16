@@ -89,3 +89,24 @@ func (d *CommonDB) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSession
 
 	return
 }
+
+func (d *CommonDB) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userSessionClientStruct *sqlbuilder.Struct) (*models.UserSessionClient, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var userSessionClient models.UserSessionClient
+	if rows.Next() {
+		addr := userSessionClientStruct.Addr(&userSessionClient)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan userSessionClient")
+		}
+
+		return &userSessionClient, nil
+	}
+
+	return nil, nil
+}
