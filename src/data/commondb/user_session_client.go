@@ -140,6 +140,18 @@ func (d *CommonDB) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *models
 	return nil
 }
 
+func (d *CommonDB) DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error {
+	clientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).For(d.Flavor)
+	deleteBuilder := clientStruct.DeleteFrom("user_session_clients")
+	deleteBuilder.Where(deleteBuilder.Equal("id", userSessionClientId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete userSessionClient")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userSessionClientStruct *sqlbuilder.Struct) (*models.UserSessionClient, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
