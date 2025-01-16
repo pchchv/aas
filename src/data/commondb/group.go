@@ -205,6 +205,50 @@ func (d *CommonDB) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string)
 	return d.getGroupCommon(tx, selectBuilder, groupStruct)
 }
 
+func (d *CommonDB) UpdateGroup(tx *sql.Tx, group *models.Group) error {
+	if group.Id == 0 {
+		return errors.WithStack(errors.New("can't update group with id 0"))
+	}
+
+	originalUpdatedAt := group.UpdatedAt
+	group.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	groupStruct := sqlbuilder.NewStruct(new(models.Group)).For(d.Flavor)
+	updateBuilder := groupStruct.WithoutTag("pk").WithoutTag("dont-update").Update(d.Flavor.Quote("groups"), group)
+	updateBuilder.Where(updateBuilder.Equal("id", group.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		group.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update group")
+	}
+
+	return nil
+}
+
+func (d *CommonDB) CountGroupMembers(tx *sql.Tx, groupId int64) (count int, err error) {
+	if groupId <= 0 {
+		return 0, errors.WithStack(errors.New("group id must be greater than 0"))
+	}
+
+	selectBuilder := d.Flavor.NewSelectBuilder()
+	selectBuilder.Select("count(*)").From("users_groups")
+	selectBuilder.Where(selectBuilder.Equal("group_id", groupId))
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return 0, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		if err = rows.Scan(&count); err != nil {
+			return 0, errors.Wrap(err, "unable to scan count")
+		}
+		return
+	}
+
+	return 0, nil
+}
+
 func (d *CommonDB) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, groupStruct *sqlbuilder.Struct) (*models.Group, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
