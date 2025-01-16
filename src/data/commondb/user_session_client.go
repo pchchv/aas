@@ -152,6 +152,37 @@ func (d *CommonDB) DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64
 	return nil
 }
 
+func (d *CommonDB) UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []models.UserSessionClient) error {
+	if userSessionClients == nil {
+		return nil
+	}
+
+	clientIds := make([]int64, 0)
+	for _, userSessionClient := range userSessionClients {
+		clientIds = append(clientIds, userSessionClient.ClientId)
+	}
+
+	clients, err := d.GetClientsByIds(tx, clientIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to get clients by ids")
+	}
+
+	clientsMap := make(map[int64]models.Client)
+	for _, client := range clients {
+		clientsMap[client.Id] = client
+	}
+
+	for i, userSessionClient := range userSessionClients {
+		if client, ok := clientsMap[userSessionClient.ClientId]; !ok {
+			return errors.Errorf("client with id %d not found", userSessionClient.ClientId)
+		} else {
+			userSessionClients[i].Client = client
+		}
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, userSessionClientStruct *sqlbuilder.Struct) (*models.UserSessionClient, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
