@@ -261,6 +261,34 @@ func (d *CommonDB) DeleteGroup(tx *sql.Tx, groupId int64) error {
 	return nil
 }
 
+func (d *CommonDB) GroupsLoadAttributes(tx *sql.Tx, groups []models.Group) error {
+	if groups == nil {
+		return nil
+	}
+
+	groupIds := make([]int64, len(groups))
+	for i, group := range groups {
+		groupIds[i] = group.Id
+	}
+
+	groupAttributes, err := d.GetGroupAttributesByGroupIds(tx, groupIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to get group attributes")
+	}
+
+	groupAttributesMap := make(map[int64][]models.GroupAttribute)
+	for _, groupAttribute := range groupAttributes {
+		groupAttributesMap[groupAttribute.GroupId] = append(groupAttributesMap[groupAttribute.GroupId], groupAttribute)
+	}
+
+	for i, group := range groups {
+		group.Attributes = groupAttributesMap[group.Id]
+		groups[i] = group
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, groupStruct *sqlbuilder.Struct) (*models.Group, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
