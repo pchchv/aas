@@ -69,6 +69,38 @@ func (d *CommonDB) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshTo
 	return nil
 }
 
+func (d *CommonDB) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error {
+	userConsentStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).For(d.Flavor)
+	deleteBuilder := userConsentStruct.DeleteFrom("refresh_tokens")
+	deleteBuilder.Where(deleteBuilder.Equal("id", refreshTokenId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete refreshToken")
+	}
+
+	return nil
+}
+
+func (d *CommonDB) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
+	deleteBuilder := d.Flavor.NewDeleteBuilder()
+	deleteBuilder.DeleteFrom("refresh_tokens")
+	now := time.Now().UTC()
+	deleteBuilder.Where(
+		deleteBuilder.Or(
+			deleteBuilder.LessThan("expires_at", now),
+			deleteBuilder.LessThan("max_lifetime", now),
+			deleteBuilder.Equal("revoked", true),
+		),
+	)
+
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete expired/revoked refresh tokens")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, refreshTokenStruct *sqlbuilder.Struct) (*models.RefreshToken, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
