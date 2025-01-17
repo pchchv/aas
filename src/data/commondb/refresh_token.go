@@ -36,6 +36,20 @@ func (d *CommonDB) CreateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshTo
 	return nil
 }
 
+func (d *CommonDB) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error) {
+	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).For(d.Flavor)
+	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
+	selectBuilder.Where(selectBuilder.Equal("id", refreshTokenId))
+	return d.getRefreshTokenCommon(tx, selectBuilder, refreshTokenStruct)
+}
+
+func (d *CommonDB) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.RefreshToken, error) {
+	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).For(d.Flavor)
+	selectBuilder := refreshTokenStruct.SelectFrom("refresh_tokens")
+	selectBuilder.Where(selectBuilder.Equal("refresh_token_jti", jti))
+	return d.getRefreshTokenCommon(tx, selectBuilder, refreshTokenStruct)
+}
+
 func (d *CommonDB) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, refreshTokenStruct *sqlbuilder.Struct) (*models.RefreshToken, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
