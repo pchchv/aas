@@ -35,3 +35,23 @@ func (d *CommonDB) CreatePreRegistration(tx *sql.Tx, preRegistration *models.Pre
 	preRegistration.Id = id
 	return nil
 }
+
+func (d *CommonDB) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, preRegistrationStruct *sqlbuilder.Struct) (*models.PreRegistration, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var preRegistration models.PreRegistration
+	if rows.Next() {
+		addr := preRegistrationStruct.Addr(&preRegistration)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan preRegistration")
+		}
+		return &preRegistration, nil
+	}
+
+	return nil, nil
+}
