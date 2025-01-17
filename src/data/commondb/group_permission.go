@@ -95,6 +95,21 @@ func (d *CommonDB) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []int64) (
 	return
 }
 
+func (d *CommonDB) GetGroupPermissionById(tx *sql.Tx, groupPermissionId int64) (*models.GroupPermission, error) {
+	groupPermissionStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).For(d.Flavor)
+	selectBuilder := groupPermissionStruct.SelectFrom("groups_permissions")
+	selectBuilder.Where(selectBuilder.Equal("id", groupPermissionId))
+	return d.getGroupPermissionCommon(tx, selectBuilder, groupPermissionStruct)
+}
+
+func (d *CommonDB) GetGroupPermissionByGroupIdAndPermissionId(tx *sql.Tx, groupId, permissionId int64) (*models.GroupPermission, error) {
+	groupPermissionStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).For(d.Flavor)
+	selectBuilder := groupPermissionStruct.SelectFrom("groups_permissions")
+	selectBuilder.Where(selectBuilder.Equal("group_id", groupId))
+	selectBuilder.Where(selectBuilder.Equal("permission_id", permissionId))
+	return d.getGroupPermissionCommon(tx, selectBuilder, groupPermissionStruct)
+}
+
 func (d *CommonDB) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, groupPermissionStruct *sqlbuilder.Struct) (*models.GroupPermission, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
