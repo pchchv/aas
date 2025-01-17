@@ -289,6 +289,78 @@ func (d *CommonDB) GroupsLoadAttributes(tx *sql.Tx, groups []models.Group) error
 	return nil
 }
 
+func (d *CommonDB) GroupLoadPermissions(tx *sql.Tx, group *models.Group) error {
+	if group == nil {
+		return nil
+	}
+
+	groupPermissions, err := d.GetGroupPermissionsByGroupIds(tx, []int64{group.Id})
+	if err != nil {
+		return errors.Wrap(err, "unable to get group permissions")
+	}
+
+	permissionIds := make([]int64, len(groupPermissions))
+	for i, groupPermission := range groupPermissions {
+		permissionIds[i] = groupPermission.PermissionId
+	}
+
+	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to get permissions")
+	}
+
+	group.Permissions = make([]models.Permission, len(permissions))
+	copy(group.Permissions, permissions)
+
+	return nil
+}
+
+func (d *CommonDB) GroupsLoadPermissions(tx *sql.Tx, groups []models.Group) error {
+	if groups == nil {
+		return nil
+	}
+
+	groupIds := make([]int64, len(groups))
+	for i, group := range groups {
+		groupIds[i] = group.Id
+	}
+
+	groupPermissions, err := d.GetGroupPermissionsByGroupIds(tx, groupIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to get group permissions")
+	}
+
+	permissionIds := make([]int64, len(groupPermissions))
+	for i, groupPermission := range groupPermissions {
+		permissionIds[i] = groupPermission.PermissionId
+	}
+
+	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
+	if err != nil {
+		return errors.Wrap(err, "unable to get permissions")
+	}
+
+	permissionsMap := make(map[int64]models.Permission)
+	for _, permission := range permissions {
+		permissionsMap[permission.Id] = permission
+	}
+
+	groupPermissionsMap := make(map[int64][]models.GroupPermission)
+	for _, groupPermission := range groupPermissions {
+		groupPermissionsMap[groupPermission.GroupId] = append(groupPermissionsMap[groupPermission.GroupId], groupPermission)
+	}
+
+	for i, group := range groups {
+		group.Permissions = make([]models.Permission, len(groupPermissionsMap[group.Id]))
+		for j, groupPermission := range groupPermissionsMap[group.Id] {
+			group.Permissions[j] = permissionsMap[groupPermission.PermissionId]
+		}
+		groups[i] = group
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, groupStruct *sqlbuilder.Struct) (*models.Group, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
