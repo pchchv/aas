@@ -50,6 +50,25 @@ func (d *CommonDB) GetPreRegistrationById(tx *sql.Tx, preRegistrationId int64) (
 	return d.getPreRegistrationCommon(tx, selectBuilder, preRegistrationStruct)
 }
 
+func (d *CommonDB) UpdatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error {
+	if preRegistration.Id == 0 {
+		return errors.WithStack(errors.New("can't update preRegistration with id 0"))
+	}
+
+	originalUpdatedAt := preRegistration.UpdatedAt
+	preRegistration.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).For(d.Flavor)
+	updateBuilder := preRegistrationStruct.WithoutTag("pk").WithoutTag("dont-update").Update("pre_registrations", preRegistration)
+	updateBuilder.Where(updateBuilder.Equal("id", preRegistration.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...);s err != nil {
+		preRegistration.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update preRegistration")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, preRegistrationStruct *sqlbuilder.Struct) (*models.PreRegistration, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
