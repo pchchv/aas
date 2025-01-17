@@ -110,6 +110,25 @@ func (d *CommonDB) GetGroupPermissionByGroupIdAndPermissionId(tx *sql.Tx, groupI
 	return d.getGroupPermissionCommon(tx, selectBuilder, groupPermissionStruct)
 }
 
+func (d *CommonDB) UpdateGroupPermission(tx *sql.Tx, groupPermission *models.GroupPermission) error {
+	if groupPermission.Id == 0 {
+		return errors.WithStack(errors.New("can't update groupPermission with id 0"))
+	}
+
+	originalUpdatedAt := groupPermission.UpdatedAt
+	groupPermission.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	groupPermissionStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).For(d.Flavor)
+	updateBuilder := groupPermissionStruct.WithoutTag("pk").WithoutTag("dont-update").Update("groups_permissions", groupPermission)
+	updateBuilder.Where(updateBuilder.Equal("id", groupPermission.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		groupPermission.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update groupPermission")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, groupPermissionStruct *sqlbuilder.Struct) (*models.GroupPermission, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
