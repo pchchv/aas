@@ -61,7 +61,7 @@ func (d *CommonDB) UpdatePreRegistration(tx *sql.Tx, preRegistration *models.Pre
 	updateBuilder := preRegistrationStruct.WithoutTag("pk").WithoutTag("dont-update").Update("pre_registrations", preRegistration)
 	updateBuilder.Where(updateBuilder.Equal("id", preRegistration.Id))
 	sql, args := updateBuilder.Build()
-	if _, err := d.ExecSql(tx, sql, args...);s err != nil {
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
 		preRegistration.UpdatedAt = originalUpdatedAt
 		return errors.Wrap(err, "unable to update preRegistration")
 	}
