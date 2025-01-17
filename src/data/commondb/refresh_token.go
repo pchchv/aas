@@ -101,6 +101,18 @@ func (d *CommonDB) DeleteExpiredOrRevokedRefreshTokens(tx *sql.Tx) error {
 	return nil
 }
 
+func (d *CommonDB) RefreshTokenLoadCode(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	if refreshToken != nil {
+		if code, err := d.GetCodeById(tx, refreshToken.CodeId); err != nil {
+			return errors.Wrap(err, "unable to load code")
+		} else if code != nil {
+			refreshToken.Code = *code
+		}
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, refreshTokenStruct *sqlbuilder.Struct) (*models.RefreshToken, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
