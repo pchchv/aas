@@ -69,6 +69,18 @@ func (d *CommonDB) UpdatePreRegistration(tx *sql.Tx, preRegistration *models.Pre
 	return nil
 }
 
+func (d *CommonDB) DeletePreRegistration(tx *sql.Tx, preRegistrationId int64) error {
+	clientStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).For(d.Flavor)
+	deleteBuilder := clientStruct.DeleteFrom("pre_registrations")
+	deleteBuilder.Where(deleteBuilder.Equal("id", preRegistrationId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete preRegistration")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, preRegistrationStruct *sqlbuilder.Struct) (*models.PreRegistration, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
