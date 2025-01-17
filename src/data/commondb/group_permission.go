@@ -129,6 +129,18 @@ func (d *CommonDB) UpdateGroupPermission(tx *sql.Tx, groupPermission *models.Gro
 	return nil
 }
 
+func (d *CommonDB) DeleteGroupPermission(tx *sql.Tx, groupPermissionId int64) error {
+	groupStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).For(d.Flavor)
+	deleteBuilder := groupStruct.DeleteFrom("groups_permissions")
+	deleteBuilder.Where(deleteBuilder.Equal("id", groupPermissionId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete groupPermission")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, groupPermissionStruct *sqlbuilder.Struct) (*models.GroupPermission, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
