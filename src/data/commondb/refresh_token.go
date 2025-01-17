@@ -35,3 +35,22 @@ func (d *CommonDB) CreateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshTo
 	refreshToken.Id = id
 	return nil
 }
+
+func (d *CommonDB) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, refreshTokenStruct *sqlbuilder.Struct) (*models.RefreshToken, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var refreshToken models.RefreshToken
+	if rows.Next() {
+		addr := refreshTokenStruct.Addr(&refreshToken)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan refreshToken")
+		}
+		return &refreshToken, nil
+	}
+	return nil, nil
+}
