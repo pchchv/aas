@@ -94,3 +94,23 @@ func (d *CommonDB) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []int64) (
 
 	return
 }
+
+func (d *CommonDB) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, groupPermissionStruct *sqlbuilder.Struct) (*models.GroupPermission, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var groupPermission models.GroupPermission
+	if rows.Next() {
+		addr := groupPermissionStruct.Addr(&groupPermission)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan groupPermission")
+		}
+		return &groupPermission, nil
+	}
+
+	return nil, nil
+}
