@@ -50,6 +50,25 @@ func (d *CommonDB) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.Refresh
 	return d.getRefreshTokenCommon(tx, selectBuilder, refreshTokenStruct)
 }
 
+func (d *CommonDB) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	if refreshToken.Id == 0 {
+		return errors.WithStack(errors.New("can't update refreshToken with id 0"))
+	}
+
+	originalUpdatedAt := refreshToken.UpdatedAt
+	refreshToken.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	refreshTokenStruct := sqlbuilder.NewStruct(new(models.RefreshToken)).For(d.Flavor)
+	updateBuilder := refreshTokenStruct.WithoutTag("pk").WithoutTag("dont-update").Update("refresh_tokens", refreshToken)
+	updateBuilder.Where(updateBuilder.Equal("id", refreshToken.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		refreshToken.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update refreshToken")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, refreshTokenStruct *sqlbuilder.Struct) (*models.RefreshToken, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
