@@ -36,6 +36,20 @@ func (d *CommonDB) CreatePreRegistration(tx *sql.Tx, preRegistration *models.Pre
 	return nil
 }
 
+func (d *CommonDB) GetPreRegistrationByEmail(tx *sql.Tx, email string) (*models.PreRegistration, error) {
+	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).For(d.Flavor)
+	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")
+	selectBuilder.Where(selectBuilder.Equal("email", email))
+	return d.getPreRegistrationCommon(tx, selectBuilder, preRegistrationStruct)
+}
+
+func (d *CommonDB) GetPreRegistrationById(tx *sql.Tx, preRegistrationId int64) (*models.PreRegistration, error) {
+	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).For(d.Flavor)
+	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")
+	selectBuilder.Where(selectBuilder.Equal("id", preRegistrationId))
+	return d.getPreRegistrationCommon(tx, selectBuilder, preRegistrationStruct)
+}
+
 func (d *CommonDB) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, preRegistrationStruct *sqlbuilder.Struct) (*models.PreRegistration, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
