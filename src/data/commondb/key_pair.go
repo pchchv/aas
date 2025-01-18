@@ -93,6 +93,18 @@ func (d *CommonDB) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*models.KeyPair,
 	return d.getKeyPairCommon(tx, selectBuilder, keyPairStruct)
 }
 
+func (d *CommonDB) DeleteKeyPair(tx *sql.Tx, keyPairId int64) error {
+	userConsentStruct := sqlbuilder.NewStruct(new(models.KeyPair)).For(d.Flavor)
+	deleteBuilder := userConsentStruct.DeleteFrom("key_pairs")
+	deleteBuilder.Where(deleteBuilder.Equal("id", keyPairId))
+	sql, args := deleteBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		return errors.Wrap(err, "unable to delete keyPair")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, keyPairStruct *sqlbuilder.Struct) (*models.KeyPair, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
