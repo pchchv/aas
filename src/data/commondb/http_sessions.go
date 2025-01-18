@@ -9,6 +9,33 @@ import (
 	"github.com/pkg/errors"
 )
 
+func (d *CommonDB) CreateHttpSession(tx *sql.Tx, httpSession *models.HttpSession) error {
+	now := time.Now().UTC()
+	originalCreatedAt := httpSession.CreatedAt
+	originalUpdatedAt := httpSession.UpdatedAt
+	httpSession.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	httpSession.UpdatedAt = sql.NullTime{Time: now, Valid: true}
+	httpSessionStruct := sqlbuilder.NewStruct(new(models.HttpSession)).For(d.Flavor)
+	insertBuilder := httpSessionStruct.WithoutTag("pk").InsertInto("http_sessions", httpSession)
+	sql, args := insertBuilder.Build()
+	result, err := d.ExecSql(tx, sql, args...)
+	if err != nil {
+		httpSession.CreatedAt = originalCreatedAt
+		httpSession.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to insert httpSession")
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		httpSession.CreatedAt = originalCreatedAt
+		httpSession.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to get last insert id")
+	}
+
+	httpSession.Id = id
+	return nil
+}
+
 func (d *CommonDB) GetHttpSessionById(tx *sql.Tx, httpSessionId int64) (*models.HttpSession, error) {
 	httpSessionStruct := sqlbuilder.NewStruct(new(models.HttpSession)).For(d.Flavor)
 	selectBuilder := httpSessionStruct.SelectFrom("http_sessions")
