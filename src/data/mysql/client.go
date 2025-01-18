@@ -29,3 +29,7 @@ func (d *MySQLDB) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 func (d *MySQLDB) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error) {
 	return d.CommonDB.GetClientByClientIdentifier(tx, clientIdentifier)
 }
+
+func (d *MySQLDB) DeleteClient(tx *sql.Tx, clientId int64) error {
+	return d.CommonDB.DeleteClient(tx, clientId)
+}
