@@ -41,3 +41,7 @@ func (d *MySQLDB) ClientLoadRedirectURIs(tx *sql.Tx, client *models.Client) erro
 func (d *MySQLDB) ClientLoadWebOrigins(tx *sql.Tx, client *models.Client) error {
 	return d.CommonDB.ClientLoadWebOrigins(tx, client)
 }
+
+func (d *MySQLDB) ClientLoadPermissions(tx *sql.Tx, client *models.Client) error {
+	return d.CommonDB.ClientLoadPermissions(tx, client)
+}
