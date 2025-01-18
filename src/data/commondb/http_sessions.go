@@ -67,6 +67,25 @@ func (d *CommonDB) DeleteHttpSessionExpired(tx *sql.Tx) error {
 	return nil
 }
 
+func (d *CommonDB) UpdateHttpSession(tx *sql.Tx, httpSession *models.HttpSession) error {
+	if httpSession.Id == 0 {
+		return errors.WithStack(errors.New("can't update httpSession with id 0"))
+	}
+
+	originalUpdatedAt := httpSession.UpdatedAt
+	httpSession.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	httpSessionStruct := sqlbuilder.NewStruct(new(models.HttpSession)).For(d.Flavor)
+	updateBuilder := httpSessionStruct.WithoutTag("pk").WithoutTag("dont-update").Update("http_sessions", httpSession)
+	updateBuilder.Where(updateBuilder.Equal("id", httpSession.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		httpSession.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update httpSession")
+	}
+
+	return nil
+}
+
 func (d *CommonDB) getHttpSessionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, httpSessionStruct *sqlbuilder.Struct) (*models.HttpSession, error) {
 	sql, args := selectBuilder.Build()
 	rows, err := d.QuerySql(tx, sql, args...)
