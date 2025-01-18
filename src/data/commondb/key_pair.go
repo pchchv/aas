@@ -77,3 +77,23 @@ func (d *CommonDB) GetAllSigningKeys(tx *sql.Tx) (keyPairs []models.KeyPair, err
 
 	return keyPairs, nil
 }
+
+func (d *CommonDB) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, keyPairStruct *sqlbuilder.Struct) (*models.KeyPair, error) {
+	sql, args := selectBuilder.Build()
+	rows, err := d.QuerySql(tx, sql, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to query database")
+	}
+	defer rows.Close()
+
+	var keyPair models.KeyPair
+	if rows.Next() {
+		addr := keyPairStruct.Addr(&keyPair)
+		if err = rows.Scan(addr...); err != nil {
+			return nil, errors.Wrap(err, "unable to scan keyPair")
+		}
+		return &keyPair, nil
+	}
+
+	return nil, nil
+}
