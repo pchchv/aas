@@ -21,3 +21,11 @@ func (d *MySQLDB) GetClientById(tx *sql.Tx, clientId int64) (*models.Client, err
 func (d *MySQLDB) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]models.Client, error) {
 	return d.CommonDB.GetClientsByIds(tx, clientIds)
 }
+
+func (d *MySQLDB) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
+	return d.CommonDB.GetAllClients(tx)
+}
+
+func (d *MySQLDB) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error) {
+	return d.CommonDB.GetClientByClientIdentifier(tx, clientIdentifier)
+}
