@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/pchchv/aas/src/enums"
 	"github.com/pchchv/aas/src/models"
 	"github.com/pkg/errors"
 )
@@ -76,6 +77,20 @@ func (d *CommonDB) GetAllSigningKeys(tx *sql.Tx) (keyPairs []models.KeyPair, err
 	}
 
 	return keyPairs, nil
+}
+
+func (d *CommonDB) GetCurrentSigningKey(tx *sql.Tx) (*models.KeyPair, error) {
+	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).For(d.Flavor)
+	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
+	selectBuilder.Where(selectBuilder.Equal("state", enums.KeyStateCurrent.String()))
+	return d.getKeyPairCommon(tx, selectBuilder, keyPairStruct)
+}
+
+func (d *CommonDB) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*models.KeyPair, error) {
+	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).For(d.Flavor)
+	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
+	selectBuilder.Where(selectBuilder.Equal("id", keyPairId))
+	return d.getKeyPairCommon(tx, selectBuilder, keyPairStruct)
 }
 
 func (d *CommonDB) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder, keyPairStruct *sqlbuilder.Struct) (*models.KeyPair, error) {
