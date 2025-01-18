@@ -2,14 +2,22 @@ package mysqldb
 
 import (
 	"database/sql"
+	"embed"
 	"fmt"
 	"log/slog"
 
+	_ "github.com/go-sql-driver/mysql"
+	gomigrate "github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/mysql"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/pchchv/aas/src/config"
 	"github.com/pchchv/aas/src/data/commondb"
 	"github.com/pkg/errors"
 )
+
+//go:embed migrations/*.sql
+var mysqlMigrationsFs embed.FS
 
 type MySQLDB struct {
 	DB       *sql.DB
@@ -74,4 +82,31 @@ func (d *MySQLDB) RollbackTransaction(tx *sql.Tx) error {
 
 func (d *MySQLDB) IsEmpty() (bool, error) {
 	return d.CommonDB.IsEmpty()
+}
+
+func (d *MySQLDB) Migrate() error {
+	driver, err := mysql.WithInstance(d.DB, &mysql.Config{
+		DatabaseName: config.GetDatabase().Name,
+	})
+	if err != nil {
+		return errors.Wrap(err, "unable to create migration driver")
+	}
+
+	iofs, err := iofs.New(mysqlMigrationsFs, "migrations")
+	if err != nil {
+		return errors.Wrap(err, "unable to create migration filesystem")
+	}
+
+	migrate, err := gomigrate.NewWithInstance("iofs", iofs, "mysql", driver)
+	if err != nil {
+		return errors.Wrap(err, "unable to create migration instance")
+	}
+
+	if err = migrate.Up(); err != nil && err != gomigrate.ErrNoChange {
+		return errors.Wrap(err, "unable to migrate the database")
+	} else if err != nil && err == gomigrate.ErrNoChange {
+		slog.Info("no need to migrate the database")
+	}
+
+	return nil
 }
