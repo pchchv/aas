@@ -35,3 +35,22 @@ func (d *CommonDB) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error {
 	keyPair.Id = id
 	return nil
 }
+
+func (d *CommonDB) UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error {
+	if keyPair.Id == 0 {
+		return errors.WithStack(errors.New("can't update keyPair with id 0"))
+	}
+
+	originalUpdatedAt := keyPair.UpdatedAt
+	keyPair.UpdatedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
+	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).For(d.Flavor)
+	updateBuilder := keyPairStruct.WithoutTag("pk").WithoutTag("dont-update").Update("key_pairs", keyPair)
+	updateBuilder.Where(updateBuilder.Equal("id", keyPair.Id))
+	sql, args := updateBuilder.Build()
+	if _, err := d.ExecSql(tx, sql, args...); err != nil {
+		keyPair.UpdatedAt = originalUpdatedAt
+		return errors.Wrap(err, "unable to update keyPair")
+	}
+
+	return nil
+}
