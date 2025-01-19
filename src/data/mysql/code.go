@@ -21,3 +21,11 @@ func (d *MySQLDB) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error) {
 func (d *MySQLDB) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*models.Code, error) {
 	return d.CommonDB.GetCodeByCodeHash(tx, codeHash, used)
 }
+
+func (d *MySQLDB) DeleteCode(tx *sql.Tx, codeId int64) error {
+	return d.CommonDB.DeleteCode(tx, codeId)
+}
+
+func (d *MySQLDB) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx) error {
+	return d.CommonDB.DeleteUsedCodesWithoutRefreshTokens(tx)
+}
