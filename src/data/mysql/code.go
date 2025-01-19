@@ -29,3 +29,11 @@ func (d *MySQLDB) DeleteCode(tx *sql.Tx, codeId int64) error {
 func (d *MySQLDB) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx) error {
 	return d.CommonDB.DeleteUsedCodesWithoutRefreshTokens(tx)
 }
+
+func (d *MySQLDB) CodeLoadClient(tx *sql.Tx, code *models.Code) error {
+	return d.CommonDB.CodeLoadClient(tx, code)
+}
+
+func (d *MySQLDB) CodeLoadUser(tx *sql.Tx, code *models.Code) error {
+	return d.CommonDB.CodeLoadUser(tx, code)
+}
