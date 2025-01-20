@@ -38,6 +38,14 @@ func (d *MySQLDB) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, page int, 
 	return d.CommonDB.GetGroupMembersPaginated(tx, groupId, page, pageSize)
 }
 
+func (d *MySQLDB) CountGroupMembers(tx *sql.Tx, groupId int64) (int, error) {
+	return d.CommonDB.CountGroupMembers(tx, groupId)
+}
+
+func (d *MySQLDB) DeleteGroup(tx *sql.Tx, groupId int64) error {
+	return d.CommonDB.DeleteGroup(tx, groupId)
+}
+
 func (d *MySQLDB) GroupLoadPermissions(tx *sql.Tx, group *models.Group) error {
 	return d.CommonDB.GroupLoadPermissions(tx, group)
 }
