@@ -37,3 +37,15 @@ func (d *MySQLDB) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) ([]m
 func (d *MySQLDB) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, page int, pageSize int) ([]models.User, int, error) {
 	return d.CommonDB.GetGroupMembersPaginated(tx, groupId, page, pageSize)
 }
+
+func (d *MySQLDB) GroupLoadPermissions(tx *sql.Tx, group *models.Group) error {
+	return d.CommonDB.GroupLoadPermissions(tx, group)
+}
+
+func (d *MySQLDB) GroupsLoadPermissions(tx *sql.Tx, groups []models.Group) error {
+	return d.CommonDB.GroupsLoadPermissions(tx, groups)
+}
+
+func (d *MySQLDB) GroupsLoadAttributes(tx *sql.Tx, groups []models.Group) error {
+	return d.CommonDB.GroupsLoadAttributes(tx, groups)
+}
