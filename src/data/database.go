@@ -2,9 +2,18 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
+	"log/slog"
+	"strings"
 	"time"
 
+	"github.com/pchchv/aas/src/config"
+	"github.com/pchchv/aas/src/data/mssqldb"
+	mysqldb "github.com/pchchv/aas/src/data/mysql"
+	postgresdb "github.com/pchchv/aas/src/data/postgres"
+	sqlitedb "github.com/pchchv/aas/src/data/sqlite"
 	"github.com/pchchv/aas/src/models"
+	"github.com/pkg/errors"
 )
 
 type Database interface {
@@ -176,4 +185,39 @@ type Database interface {
 	GetHttpSessionById(tx *sql.Tx, httpSessionId int64) (*models.HttpSession, error)
 	DeleteHttpSession(tx *sql.Tx, httpSessionId int64) error
 	DeleteHttpSessionExpired(tx *sql.Tx) error
+}
+
+func NewDatabase() (database Database, err error) {
+	// Remove leading and trailing single or double quotes from config.DBType
+	dbType := strings.Trim(config.GetDatabase().Type, "\"'")
+
+	slog.Info("database type: " + dbType)
+
+	switch dbType {
+	case "mysql":
+		slog.Info("creating mysql database")
+		database, err = mysqldb.NewMySQLDB()
+	case "sqlite":
+		slog.Info("creating sqlite database")
+		database, err = sqlitedb.NewSQLiteDB()
+	case "postgres":
+		slog.Info("creating postgres database")
+		database, err = postgresdb.NewPostgresDB()
+	case "mssql":
+		slog.Info("creating mssql database")
+		database, err = mssqldb.NewMsSQLDB()
+	default:
+		msg := fmt.Sprintf("unsupported database type: %s (string length %d). supported types are: mysql, sqlite, postgres, mssql", dbType, len(dbType))
+		return nil, errors.WithStack(errors.New(msg))
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err = database.Migrate(); err != nil {
+		return nil, err
+	}
+
+	return
 }
