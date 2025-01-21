@@ -121,14 +121,19 @@ func TestDecodeAndValidateTokenResponse_EmptyTokens(t *testing.T) {
 	assert.Nil(t, token.RefreshToken)
 }
 
-func createTestToken(privateKey *rsa.PrivateKey, claims map[string]interface{}, expirationTime time.Time) (string, error) {
+func createTestToken(privateKey *rsa.PrivateKey, claims map[string]interface{}, expirationTime time.Time) string {
 	token := jwt.New(jwt.SigningMethodRS256)
 	claims["exp"] = expirationTime.Unix()
 	for k, v := range claims {
 		token.Claims.(jwt.MapClaims)[k] = v
 	}
 
-	return token.SignedString(privateKey)
+	tokenString, err := token.SignedString(privateKey)
+	if err != nil {
+		panic(err)
+	}
+
+	return tokenString
 }
 
 func exportRSAPublicKeyAsPEMStr(pubkey *rsa.PublicKey) string {
