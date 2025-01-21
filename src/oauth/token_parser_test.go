@@ -95,3 +95,24 @@ func TestDecodeAndValidateTokenString_EmptyToken(t *testing.T) {
 	assert.Equal(t, "", result.TokenBase64)
 	assert.Nil(t, result.Claims)
 }
+
+func createTestToken(privateKey *rsa.PrivateKey, claims map[string]interface{}, expirationTime time.Time) (string, error) {
+	token := jwt.New(jwt.SigningMethodRS256)
+	claims["exp"] = expirationTime.Unix()
+	for k, v := range claims {
+		token.Claims.(jwt.MapClaims)[k] = v
+	}
+
+	return token.SignedString(privateKey)
+}
+
+func exportRSAPublicKeyAsPEMStr(pubkey *rsa.PublicKey) string {
+	pubkeyBytes, _ := x509.MarshalPKIXPublicKey(pubkey)
+	pubkeyPem := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PUBLIC KEY",
+			Bytes: pubkeyBytes,
+		},
+	)
+	return string(pubkeyPem)
+}
