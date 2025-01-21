@@ -13,7 +13,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/pchchv/aas/src/config"
-	"github.com/pchchv/aas/src/data/commondb"
+	"github.com/pchchv/aas/src/database/commondb"
 	"github.com/pkg/errors"
 	sqlitedriver "modernc.org/sqlite"
 )

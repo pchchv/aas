@@ -13,7 +13,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pchchv/aas/src/config"
-	"github.com/pchchv/aas/src/data/commondb"
+	"github.com/pchchv/aas/src/database/commondb"
 	"github.com/pkg/errors"
 )
 

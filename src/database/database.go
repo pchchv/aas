@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/pchchv/aas/src/config"
-	"github.com/pchchv/aas/src/data/mssqldb"
-	mysqldb "github.com/pchchv/aas/src/data/mysql"
-	postgresdb "github.com/pchchv/aas/src/data/postgres"
-	sqlitedb "github.com/pchchv/aas/src/data/sqlite"
+	"github.com/pchchv/aas/src/database/mssqldb"
+	mysqldb "github.com/pchchv/aas/src/database/mysql"
+	postgresdb "github.com/pchchv/aas/src/database/postgres"
+	sqlitedb "github.com/pchchv/aas/src/database/sqlite"
 	"github.com/pchchv/aas/src/models"
 	"github.com/pkg/errors"
 )

@@ -4,14 +4,14 @@ import (
 	"crypto/rsa"
 
 	"github.com/golang-jwt/jwt"
-	db "github.com/pchchv/aas/src/data"
+	"github.com/pchchv/aas/src/database"
 )
 
 type TokenParser struct {
-	database db.Database
+	database database.Database
 }
 
-func NewTokenParser(database db.Database) *TokenParser {
+func NewTokenParser(database database.Database) *TokenParser {
 	return &TokenParser{
 		database: database,
 	}
