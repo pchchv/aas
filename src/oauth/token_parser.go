@@ -47,6 +47,37 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string, pubKey *rsa.Pu
 	return
 }
 
+func (tp *TokenParser) DecodeAndValidateTokenResponse(tokenResponse *TokenResponse) (token *JwtInfo, err error) {
+	pubKey, err := tp.getPublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	token = &JwtInfo{
+		TokenResponse: *tokenResponse,
+	}
+
+	if len(tokenResponse.AccessToken) > 0 {
+		if token.AccessToken, err = tp.DecodeAndValidateTokenString(tokenResponse.AccessToken, pubKey, true); err != nil {
+			return nil, err
+		}
+	}
+
+	if len(tokenResponse.IdToken) > 0 {
+		if token.IdToken, err = tp.DecodeAndValidateTokenString(tokenResponse.IdToken, pubKey, true); err != nil {
+			return nil, err
+		}
+	}
+
+	if len(tokenResponse.RefreshToken) > 0 {
+		if token.RefreshToken, err = tp.DecodeAndValidateTokenString(tokenResponse.RefreshToken, pubKey, false); err != nil {
+			return nil, err
+		}
+	}
+
+	return
+}
+
 func (tp *TokenParser) getPublicKey() (pubKey *rsa.PublicKey, err error) {
 	keyPair, err := tp.database.GetCurrentSigningKey(nil)
 	if err != nil {
