@@ -3,7 +3,7 @@ package oauth
 import (
 	"crypto/rsa"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/pchchv/aas/src/database"
 )
 
