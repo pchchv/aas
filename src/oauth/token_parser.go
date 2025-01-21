@@ -17,20 +17,6 @@ func NewTokenParser(database database.Database) *TokenParser {
 	}
 }
 
-func (tp *TokenParser) getPublicKey() (pubKey *rsa.PublicKey, err error) {
-	keyPair, err := tp.database.GetCurrentSigningKey(nil)
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey, err = jwt.ParseRSAPublicKeyFromPEM(keyPair.PublicKeyPEM)
-	if err != nil {
-		return nil, err
-	}
-
-	return
-}
-
 func (tp *TokenParser) DecodeAndValidateTokenString(token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (t *Jwt, err error) {
 	if pubKey == nil {
 		if pubKey, err = tp.getPublicKey(); err != nil {
@@ -56,6 +42,20 @@ func (tp *TokenParser) DecodeAndValidateTokenString(token string, pubKey *rsa.Pu
 			return nil, err
 		}
 		t.Claims = claims
+	}
+
+	return
+}
+
+func (tp *TokenParser) getPublicKey() (pubKey *rsa.PublicKey, err error) {
+	keyPair, err := tp.database.GetCurrentSigningKey(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey, err = jwt.ParseRSAPublicKeyFromPEM(keyPair.PublicKeyPEM)
+	if err != nil {
+		return nil, err
 	}
 
 	return
