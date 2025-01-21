@@ -10,7 +10,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pchchv/aas/src/database/mocks"
+	"github.com/pchchv/aas/src/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestDecodeAndValidateTokenString(t *testing.T) {
@@ -94,6 +96,29 @@ func TestDecodeAndValidateTokenString_EmptyToken(t *testing.T) {
 	assert.NotNil(t, result)
 	assert.Equal(t, "", result.TokenBase64)
 	assert.Nil(t, result.Claims)
+}
+
+func TestDecodeAndValidateTokenResponse_EmptyTokens(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	tp := NewTokenParser(mockDB)
+	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	publicKeyPEM := exportRSAPublicKeyAsPEMStr(&privateKey.PublicKey)
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
+		PublicKeyPEM: []byte(publicKeyPEM),
+	}, nil)
+
+	tokenResponse := &TokenResponse{
+		AccessToken:  "",
+		IdToken:      "",
+		RefreshToken: "",
+	}
+
+	token, err := tp.DecodeAndValidateTokenResponse(tokenResponse)
+	assert.NoError(t, err)
+	assert.NotNil(t, token)
+	assert.Nil(t, token.AccessToken)
+	assert.Nil(t, token.IdToken)
+	assert.Nil(t, token.RefreshToken)
 }
 
 func createTestToken(privateKey *rsa.PrivateKey, claims map[string]interface{}, expirationTime time.Time) (string, error) {
