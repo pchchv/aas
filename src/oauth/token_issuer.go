@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"context"
 	"crypto/rsa"
 	"database/sql"
 	"fmt"
@@ -36,6 +37,82 @@ func NewTokenIssuer(database database.Database, tokenParser *TokenParser) *Token
 		database:    database,
 		tokenParser: tokenParser,
 	}
+}
+
+func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context, code *models.Code) (*TokenResponse, error) {
+	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+	if err := t.database.CodeLoadClient(nil, code); err != nil {
+		return nil, err
+	}
+
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if code.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = code.Client.TokenExpirationInSeconds
+	}
+
+	var tokenResponse = TokenResponse{
+		TokenType: enums.TokenTypeBearer.String(),
+		ExpiresIn: int64(tokenExpirationInSeconds),
+	}
+
+	keyPair, err := t.database.GetCurrentSigningKey(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to parse private key from PEM")
+	}
+
+	now := time.Now().UTC()
+
+	// access_token -----------------------------------------------------------------------
+
+	if err = t.database.CodeLoadUser(nil, code); err != nil {
+		return nil, err
+	}
+
+	if err = t.database.UserLoadGroups(nil, &code.User); err != nil {
+		return nil, err
+	}
+
+	if err = t.database.GroupsLoadAttributes(nil, code.User.Groups); err != nil {
+		return nil, err
+	}
+
+	if err = t.database.UserLoadAttributes(nil, &code.User); err != nil {
+		return nil, err
+	}
+
+	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	tokenResponse.AccessToken = accessTokenStr
+	tokenResponse.Scope = scopeFromAccessToken
+
+	// id_token ---------------------------------------------------------------------------
+
+	scopes := strings.Split(code.Scope, " ")
+	if slices.Contains(scopes, "openid") {
+		if idTokenStr, err := t.generateIdToken(settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier); err != nil {
+			return nil, err
+		} else {
+			tokenResponse.IdToken = idTokenStr
+		}
+	}
+
+	// refresh_token ----------------------------------------------------------------------
+
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, code, scopeFromAccessToken, now, privKey, keyPair.KeyIdentifier, nil)
+	if err != nil {
+		return nil, err
+	}
+	tokenResponse.RefreshToken = refreshToken
+	tokenResponse.RefreshExpiresIn = refreshExpiresIn
+
+	return &tokenResponse, nil
 }
 
 func (t *TokenIssuer) addClaimIfNotEmpty(claims jwt.MapClaims, claimName string, claimValue string) {
