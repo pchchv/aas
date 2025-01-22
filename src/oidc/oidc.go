@@ -1,5 +1,12 @@
 package oidc
 
+import (
+	"slices"
+	"strings"
+)
+
+const OfflineAccessScope = "offline_access"
+
 func GetIdTokenScopeDescription(scope string) string {
 	switch scope {
 	case "openid":
@@ -21,4 +28,13 @@ func GetIdTokenScopeDescription(scope string) string {
 	default:
 		return ""
 	}
+}
+
+func IsIdTokenScope(scope string) bool {
+	oidcScopes := []string{"openid", "profile", "email", "address", "phone", "groups", "attributes"}
+	return slices.Contains(oidcScopes, scope)
+}
+
+func IsOfflineAccessScope(scope string) bool {
+	return strings.EqualFold(strings.TrimSpace(scope), "offline_access")
 }
