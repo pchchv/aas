@@ -787,6 +787,333 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
+func TestGenerateTokenResponseForClientCred(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	mockTokenParser := &TokenParser{}
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+
+	settings := &models.Settings{
+		Issuer:                   "https://test-issuer.com",
+		TokenExpirationInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	tests := []struct {
+		name           string
+		client         *models.Client
+		scope          string
+		expectedScopes []string
+		expectedAud    interface{}
+	}{
+		{
+			name: "Single custom scope",
+			client: &models.Client{
+				Id:               1,
+				ClientIdentifier: "test-client-1",
+			},
+			scope:          "resource1:read",
+			expectedScopes: []string{"resource1:read"},
+			expectedAud:    "resource1",
+		},
+		{
+			name: "Multiple custom scopes",
+			client: &models.Client{
+				Id:               2,
+				ClientIdentifier: "test-client-2",
+			},
+			scope:          "resource1:read resource2:write",
+			expectedScopes: []string{"resource1:read", "resource2:write"},
+			expectedAud:    []interface{}{"resource1", "resource2"},
+		},
+		{
+			name: "Custom scopes with OIDC scopes (should be ignored)",
+			client: &models.Client{
+				Id:               3,
+				ClientIdentifier: "test-client-3",
+			},
+			scope:          "resource1:read openid profile",
+			expectedScopes: []string{"resource1:read"},
+			expectedAud:    "resource1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
+				KeyIdentifier: "test-key-id",
+				PrivateKeyPEM: privateKeyBytes,
+			}, nil)
+
+			response, err := tokenIssuer.GenerateTokenResponseForClientCred(ctx, tt.client, tt.scope)
+
+			assert.NoError(t, err)
+			assert.NotNil(t, response)
+			assert.Equal(t, "Bearer", response.TokenType)
+			assert.Equal(t, int64(3600), response.ExpiresIn)
+			assert.NotEmpty(t, response.AccessToken)
+			assert.Empty(t, response.IdToken)
+			assert.Empty(t, response.RefreshToken)
+			assert.Equal(t, tt.scope, response.Scope)
+
+			claims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+
+			assert.Equal(t, settings.Issuer, claims["iss"])
+			assert.Equal(t, tt.client.ClientIdentifier, claims["sub"])
+			assert.Equal(t, tt.expectedAud, claims["aud"])
+			assert.Equal(t, "Bearer", claims["typ"])
+			assert.Equal(t, tt.scope, claims["scope"])
+
+			assertTimeClaimWithinRange(t, claims, "iat", 0*time.Second, "iat should be now")
+			assertTimeClaimWithinRange(t, claims, "exp", 3600*time.Second, "exp should be 3600 seconds from now")
+
+			_, err = uuid.Parse(claims["jti"].(string))
+			assert.NoError(t, err)
+
+			mockDB.AssertExpectations(t)
+		})
+	}
+}
+
+func TestGenerateTokenResponseForClientCred_InvalidScope(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	mockTokenParser := &TokenParser{}
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+
+	settings := &models.Settings{
+		Issuer:                   "https://test-issuer.com",
+		TokenExpirationInSeconds: 3600,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	client := &models.Client{
+		Id:               4,
+		ClientIdentifier: "test-client-4",
+	}
+
+	privateKeyBytes := getTestPrivateKey(t)
+
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+	}, nil)
+
+	response, err := tokenIssuer.GenerateTokenResponseForClientCred(ctx, client, "invalid-scope")
+
+	if err == nil {
+		t.Error("Expected an error, but got nil")
+		if response != nil {
+			t.Errorf("Unexpected response: %+v", response)
+		}
+	} else {
+		assert.Contains(t, err.Error(), "invalid scope: invalid-scope")
+	}
+
+	mockDB.AssertExpectations(t)
+}
+
+func TestGenerateTokenResponseForRefresh(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	mockTokenParser := &TokenParser{}
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200, // 20 minutes
+		UserSessionMaxLifetimeInSeconds:         2400, // 40 minutes
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	now := time.Now().UTC()
+	sub := uuid.New()
+	sessionIdentifier := "test-session-123"
+	config.Get().BaseURL = "http://localhost:8081"
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	code := &models.Code{
+		Id:                1,
+		ClientId:          1,
+		UserId:            1,
+		Scope:             "openid profile resource1:read",
+		Nonce:             "test-nonce",
+		AuthenticatedAt:   now.Add(-5 * time.Minute),
+		SessionIdentifier: sessionIdentifier,
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthMethods:       "pwd",
+	}
+	client := &models.Client{
+		Id:                       1,
+		ClientIdentifier:         "test-client",
+		TokenExpirationInSeconds: 900,
+	}
+	user := &models.User{
+		Id:            1,
+		Subject:       sub,
+		Email:         "test@example.com",
+		EmailVerified: true,
+		Username:      "testuser",
+		GivenName:     "Test",
+		FamilyName:    "User",
+		UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
+	}
+
+	refreshToken := &models.RefreshToken{
+		Id:                   1,
+		RefreshTokenJti:      "existing-jti",
+		FirstRefreshTokenJti: "first-jti",
+		MaxLifetime:          sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
+	}
+
+	refreshTokenInfo := &Jwt{
+		Claims: jwt.MapClaims{
+			"jti":    "existing-jti",
+			"scope":  "openid profile resource1:read",
+			"exp":    now.Add(1 * time.Hour).Unix(),
+			"iat":    now.Add(-1 * time.Hour).Unix(),
+			"iss":    "https://test-issuer.com",
+			"aud":    "https://test-issuer.com",
+			"sub":    sub.String(),
+			"typ":    "Refresh",
+			"sid":    sessionIdentifier,
+			"client": client.ClientIdentifier,
+		},
+	}
+
+	mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
+	code.Client = *client
+	mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+	code.User = *user
+	mockDB.On("UserLoadGroups", mock.Anything, &code.User).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, code.User.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, &code.User).Return(nil)
+	var capturedRefreshToken *models.RefreshToken
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).
+		Run(func(args mock.Arguments) {
+			capturedRefreshToken = args.Get(1).(*models.RefreshToken)
+		}).
+		Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+	}, nil)
+	// Add the missing mock expectation
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
+		Id:           1,
+		UserId:       1,
+		Started:      now.Add(-30 * time.Minute),
+		LastAccessed: now.Add(-5 * time.Minute),
+	}, nil)
+
+	input := &GenerateTokenForRefreshInput{
+		Code:             code,
+		ScopeRequested:   "openid profile resource1:read",
+		RefreshToken:     refreshToken,
+		RefreshTokenInfo: refreshTokenInfo,
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForRefresh(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Equal(t, "Bearer", response.TokenType)
+	assert.Equal(t, int64(900), response.ExpiresIn) // client override
+	assert.NotEmpty(t, response.AccessToken)
+	assert.NotEmpty(t, response.IdToken)
+	assert.NotEmpty(t, response.RefreshToken)
+	assert.Equal(t, "openid profile resource1:read authserver:userinfo", response.Scope)
+	assert.InDelta(t, int64(600), response.RefreshExpiresIn, 1) // remaining time based on session max lifetime
+
+	// validate Id token --------------------------------------------
+
+	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	assert.Equal(t, settings.Issuer, idClaims["iss"])
+	assert.Equal(t, user.Subject.String(), idClaims["sub"])
+	assert.Equal(t, client.ClientIdentifier, idClaims["aud"])
+	assert.Equal(t, code.Nonce, idClaims["nonce"])
+	assert.Equal(t, code.AcrLevel, idClaims["acr"])
+	assert.Equal(t, code.AuthMethods, idClaims["amr"])
+	assert.Equal(t, sessionIdentifier, idClaims["sid"])
+	assert.Equal(t, "ID", idClaims["typ"])
+	assertTimeClaimWithinRange(t, idClaims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
+	assertTimeClaimWithinRange(t, idClaims, "exp", 900*time.Second, "exp should be 900 seconds from now")
+	assertTimeClaimWithinRange(t, idClaims, "iat", 0*time.Second, "iat should be now")
+	assert.Equal(t, user.FamilyName, idClaims["family_name"])
+	assert.Equal(t, user.GivenName, idClaims["given_name"])
+	assert.Equal(t, user.GetFullName(), idClaims["name"])
+	assert.Equal(t, user.Username, idClaims["preferred_username"])
+	assert.Equal(t, fmt.Sprintf("%v/account/profile", config.Get().BaseURL), idClaims["profile"])
+	_, err = uuid.Parse(idClaims["jti"].(string))
+	assert.NoError(t, err)
+	assertTimeClaimWithinRange(t, idClaims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
+
+	// validate Access token --------------------------------------------
+
+	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+	assert.Equal(t, settings.Issuer, accessClaims["iss"])
+	assert.Equal(t, user.Subject.String(), accessClaims["sub"])
+	assert.ElementsMatch(t, []string{constants.AuthServerResourceIdentifier, "resource1"}, accessClaims["aud"])
+	assert.Equal(t, code.Nonce, accessClaims["nonce"])
+	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
+	assert.Equal(t, code.AuthMethods, accessClaims["amr"])
+	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
+	assert.Equal(t, "Bearer", accessClaims["typ"])
+	assert.Equal(t, user.FamilyName, accessClaims["family_name"])
+	assert.Equal(t, user.GivenName, accessClaims["given_name"])
+	assert.Equal(t, user.GetFullName(), accessClaims["name"])
+	assert.Equal(t, user.Username, accessClaims["preferred_username"])
+	assert.Equal(t, fmt.Sprintf("%v/account/profile", config.Get().BaseURL), accessClaims["profile"])
+	assert.Equal(t, "openid profile resource1:read authserver:userinfo", accessClaims["scope"])
+	_, err = uuid.Parse(accessClaims["jti"].(string))
+	assert.NoError(t, err)
+	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
+
+	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "exp", 900*time.Second, "exp should be 900 seconds from now")
+	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -300*time.Second, "auth_time should be 300 seconds ago")
+
+	// validate Refresh token --------------------------------------------
+
+	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, publicKeyBytes)
+	assert.Equal(t, user.Subject.String(), refreshClaims["sub"])
+	assert.Equal(t, "https://test-issuer.com", refreshClaims["aud"])
+	assert.Equal(t, "https://test-issuer.com", refreshClaims["iss"])
+	assert.Equal(t, "Refresh", refreshClaims["typ"])
+	assert.Equal(t, "openid profile resource1:read authserver:userinfo", refreshClaims["scope"])
+	_, err = uuid.Parse(refreshClaims["jti"].(string))
+	assert.NoError(t, err)
+	assert.Equal(t, sessionIdentifier, refreshClaims["sid"])
+
+	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, "exp should be 600 seconds from now")
+	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
+
+	// validate Refresh token passed to CreateRefreshToken --------------------------------------------
+
+	assert.NotNil(t, capturedRefreshToken)
+	assert.Equal(t, code.Id, capturedRefreshToken.CodeId)
+	assert.NotEmpty(t, capturedRefreshToken.RefreshTokenJti)
+	assert.Equal(t, refreshToken.FirstRefreshTokenJti, capturedRefreshToken.FirstRefreshTokenJti)
+	assert.Equal(t, refreshToken.RefreshTokenJti, capturedRefreshToken.PreviousRefreshTokenJti)
+	assert.Equal(t, "Refresh", capturedRefreshToken.RefreshTokenType)
+	assert.Equal(t, "openid profile resource1:read authserver:userinfo", capturedRefreshToken.Scope)
+	assert.Equal(t, sessionIdentifier, capturedRefreshToken.SessionIdentifier)
+	assert.False(t, capturedRefreshToken.Revoked)
+	assert.True(t, capturedRefreshToken.IssuedAt.Valid)
+	assert.WithinDuration(t, now, capturedRefreshToken.IssuedAt.Time, 1*time.Second)
+	assert.True(t, capturedRefreshToken.ExpiresAt.Valid)
+	assert.WithinDuration(t, now.Add(600*time.Second), capturedRefreshToken.ExpiresAt.Time, 1*time.Second)
+
+	mockDB.AssertExpectations(t)
+}
+
 func getTestPublicKey(t *testing.T) []byte {
 	publicKeyBase64 := "LS0tLS1CRUdJTiBSU0EgUFVCTElDIEtFWS0tLS0tCk1JSUNJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBZzhBTUlJQ0NnS0NBZ0VBb2Q3dFRUeVlCUjI0aDg1WEZaUkcKcUg4QXNuRTBXVHliRFZELzRYajdWSHY3RWErclU1S2cyVFdKNjhkL09BcCtNK1lMYnVMYXdIVk1mWWtQM0lhWgpTR1d6cHdCVXhxc0lmWTlLbEdaWjN3aGJIWi9EZWRCU2I1UjNkdnJjUEIvQmcrMkFucUVnRkV2N3Y4djZFT1psClJNU0RxR0t2VEU0a083UUFUR0JZbUJoTDZmNytPUnlRRmNLdUFZZ29DZmlKOG1hb3FkK1dIREk5TWMyTlBncncKMzhOaW1mQ3ZFM3VWbXljdFFyMDN3TTAyT1A0M0IyS3pCdUREc2ZKdUZWSVFWTUVtU2IyQ2ZqMjloWkpGMCtJWgpVZWYvVHhXQTZyVWpTK1pYSGtudXlYNDBVb1pYYUFJVU5zbUVEeVUxWHRKRTh5Ym1xSHdNK3BjT2dCSzh3TElXCk5LVkVFSDVtMjBsaStqMjdnSThvcVlNamJCYjdyYlI1L2JnSmdjL05qU2c4bTZrZDJzVC9TSmltMlI2eENFOEgKeVdTbEdvQkxIZTlSQUJYcUR4UTg5RCtiTGRRb1V5R1N2RVJVWXBBNzZYNGViY2tqdnR0UFl3cTFSWEZuS0VzbwpoUTQ0SVFySEFMTTRmcTQyRXF2WkZvTUxQVmhvT0xOSWd2NUlhU1lHZm9IMW1uQlZPZkJzZ3B4ejk0czRCNTJyCjFNcE5GaE1qaG1SSXBCcWYvSHNPalNtM05mUG1pYkVVQ0c2OEo3aSthU3ZvVTdwSnVZQzgyQW1TWmwxeWxLOTcKRjRUUG1RaGJUNG5yMlZxMS9oMGpwQUIzNW5DUS9tM09Sckl6RXYzL0F0UEdnbktlWENML3M0ZUQzd2hzbkNaTAowVmVMNmVFYWhoUFYydW05VlZzeVowVUNBd0VBQVE9PQotLS0tLUVORCBSU0EgUFVCTElDIEtFWS0tLS0tCg=="
 	publicKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyBase64)
