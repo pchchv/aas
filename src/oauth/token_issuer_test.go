@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -1275,6 +1276,262 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assert.WithinDuration(t, now.Add(172800*time.Second), capturedRefreshToken.MaxLifetime.Time, 1*time.Second)
 
 	mockDB.AssertExpectations(t)
+}
+
+func TestAddOpenIdConnectClaims(t *testing.T) {
+	tokenIssuer := &TokenIssuer{}
+	now := time.Now().UTC()
+	testCases := []struct {
+		name     string
+		code     *models.Code
+		expected jwt.MapClaims
+	}{
+		{
+			name: "Full scope",
+			code: &models.Code{
+				Scope: "openid profile email address phone",
+				User: models.User{
+					Email:               "test@example.com",
+					EmailVerified:       true,
+					Username:            "testuser",
+					GivenName:           "Test",
+					MiddleName:          "Middle",
+					FamilyName:          "User",
+					Nickname:            "Testy",
+					Website:             "https://test.com",
+					Gender:              "male",
+					BirthDate:           sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
+					ZoneInfo:            "Europe/London",
+					Locale:              "en-GB",
+					PhoneNumber:         "+1234567890",
+					PhoneNumberVerified: true,
+					AddressLine1:        "123 Test St",
+					AddressLine2:        "Apt 4",
+					AddressLocality:     "Testville",
+					AddressRegion:       "Testshire",
+					AddressPostalCode:   "TE1 2ST",
+					AddressCountry:      "Testland",
+					UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
+				},
+			},
+			expected: jwt.MapClaims{
+				"name":                  "Test Middle User",
+				"given_name":            "Test",
+				"middle_name":           "Middle",
+				"family_name":           "User",
+				"nickname":              "Testy",
+				"preferred_username":    "testuser",
+				"profile":               "http://localhost:8081/account/profile",
+				"website":               "https://test.com",
+				"gender":                "male",
+				"birthdate":             "1990-01-01",
+				"zoneinfo":              "Europe/London",
+				"locale":                "en-GB",
+				"email":                 "test@example.com",
+				"email_verified":        true,
+				"phone_number":          "+1234567890",
+				"phone_number_verified": true,
+				"updated_at":            now.Add(-1 * time.Hour).Unix(),
+			},
+		},
+		{
+			name: "Minimal scope",
+			code: &models.Code{
+				Scope: "openid",
+				User: models.User{
+					Email:     "minimal@example.com",
+					UpdatedAt: sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
+				},
+			},
+			expected: jwt.MapClaims{},
+		},
+		{
+			name: "Profile scope only",
+			code: &models.Code{
+				Scope: "openid profile",
+				User: models.User{
+					Username:   "profileuser",
+					GivenName:  "Profile",
+					FamilyName: "User",
+					UpdatedAt:  sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
+				},
+			},
+			expected: jwt.MapClaims{
+				"name":               "Profile User",
+				"given_name":         "Profile",
+				"family_name":        "User",
+				"preferred_username": "profileuser",
+				"profile":            "http://localhost:8081/account/profile",
+				"updated_at":         now.Add(-1 * time.Hour).Unix(),
+			},
+		},
+		{
+			name: "Email scope only",
+			code: &models.Code{
+				Scope: "openid email",
+				User: models.User{
+					Email:         "email@example.com",
+					EmailVerified: true,
+					UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
+				},
+			},
+			expected: jwt.MapClaims{
+				"email":          "email@example.com",
+				"email_verified": true,
+				"updated_at":     now.Add(-1 * time.Hour).Unix(),
+			},
+		},
+		{
+			name: "Address scope only",
+			code: &models.Code{
+				Scope: "openid address",
+				User: models.User{
+					AddressLine1:      "456 Address St",
+					AddressLocality:   "Addressville",
+					AddressRegion:     "Addressshire",
+					AddressPostalCode: "AD1 3SS",
+					AddressCountry:    "Addressland",
+					UpdatedAt:         sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
+				},
+			},
+			expected: jwt.MapClaims{
+				"updated_at": now.Add(-1 * time.Hour).Unix(),
+			},
+		},
+		{
+			name: "Phone scope only",
+			code: &models.Code{
+				Scope: "openid phone",
+				User: models.User{
+					PhoneNumber:         "+9876543210",
+					PhoneNumberVerified: false,
+					UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
+				},
+			},
+			expected: jwt.MapClaims{
+				"phone_number":          "+9876543210",
+				"phone_number_verified": false,
+				"updated_at":            now.Add(-1 * time.Hour).Unix(),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			claims := make(jwt.MapClaims)
+			config.Get().BaseURL = "http://localhost:8081"
+
+			tokenIssuer.addOpenIdConnectClaims(claims, tc.code)
+
+			for key, expectedValue := range tc.expected {
+				assert.Equal(t, expectedValue, claims[key], "Mismatch for claim: %s", key)
+			}
+
+			if tc.code.Scope != "openid" {
+				assert.NotZero(t, claims["updated_at"], "updated_at should be set")
+			}
+
+			// Check for address claim separately
+			if strings.Contains(tc.code.Scope, "address") {
+				addressClaim, ok := claims["address"].(map[string]string)
+				assert.True(t, ok, "Address claim should be of type map[string]string")
+				if ok {
+					assert.Equal(t, tc.code.User.AddressLine1+"\r\n"+tc.code.User.AddressLine2, addressClaim["street_address"])
+					assert.Equal(t, tc.code.User.AddressLocality, addressClaim["locality"])
+					assert.Equal(t, tc.code.User.AddressRegion, addressClaim["region"])
+					assert.Equal(t, tc.code.User.AddressPostalCode, addressClaim["postal_code"])
+					assert.Equal(t, tc.code.User.AddressCountry, addressClaim["country"])
+					expectedFormatted := strings.TrimSpace(tc.code.User.AddressLine1 + "\r\n" + tc.code.User.AddressLine2 + "\r\n" +
+						tc.code.User.AddressLocality + "\r\n" + tc.code.User.AddressRegion + "\r\n" +
+						tc.code.User.AddressPostalCode + "\r\n" + tc.code.User.AddressCountry)
+					assert.Equal(t, expectedFormatted, addressClaim["formatted"])
+				}
+			}
+
+			for key := range claims {
+				if key != "updated_at" && key != "address" {
+					_, expected := tc.expected[key]
+					assert.True(t, expected, "Unexpected claim: %s", key)
+				}
+			}
+		})
+	}
+}
+
+func TestAddClaimIfNotEmpty(t *testing.T) {
+	tokenIssuer := &TokenIssuer{}
+	testCases := []struct {
+		name           string
+		claims         jwt.MapClaims
+		claimName      string
+		claimValue     string
+		expectedClaims jwt.MapClaims
+	}{
+		{
+			name:           "Non-empty claim",
+			claims:         jwt.MapClaims{},
+			claimName:      "test_claim",
+			claimValue:     "test_value",
+			expectedClaims: jwt.MapClaims{"test_claim": "test_value"},
+		},
+		{
+			name:           "Empty claim",
+			claims:         jwt.MapClaims{},
+			claimName:      "empty_claim",
+			claimValue:     "",
+			expectedClaims: jwt.MapClaims{},
+		},
+		{
+			name:           "Whitespace-only claim",
+			claims:         jwt.MapClaims{},
+			claimName:      "whitespace_claim",
+			claimValue:     "   ",
+			expectedClaims: jwt.MapClaims{},
+		},
+		{
+			name:           "Claim with leading/trailing whitespace",
+			claims:         jwt.MapClaims{},
+			claimName:      "trimmed_claim",
+			claimValue:     "  trimmed_value  ",
+			expectedClaims: jwt.MapClaims{"trimmed_claim": "  trimmed_value  "},
+		},
+		{
+			name:           "Adding to existing claims",
+			claims:         jwt.MapClaims{"existing_claim": "existing_value"},
+			claimName:      "new_claim",
+			claimValue:     "new_value",
+			expectedClaims: jwt.MapClaims{"existing_claim": "existing_value", "new_claim": "new_value"},
+		},
+		{
+			name:           "Overwriting existing claim",
+			claims:         jwt.MapClaims{"overwrite_claim": "old_value"},
+			claimName:      "overwrite_claim",
+			claimValue:     "new_value",
+			expectedClaims: jwt.MapClaims{"overwrite_claim": "new_value"},
+		},
+		{
+			name:           "Unicode claim value",
+			claims:         jwt.MapClaims{},
+			claimName:      "unicode_claim",
+			claimValue:     "こんにちは",
+			expectedClaims: jwt.MapClaims{"unicode_claim": "こんにちは"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tokenIssuer.addClaimIfNotEmpty(tc.claims, tc.claimName, tc.claimValue)
+
+			assert.Equal(t, tc.expectedClaims, tc.claims, "Claims do not match expected values")
+
+			if len(strings.TrimSpace(tc.claimValue)) > 0 {
+				assert.Contains(t, tc.claims, tc.claimName, "Claim should be added")
+				assert.Equal(t, tc.claimValue, tc.claims[tc.claimName], "Claim value should match")
+			} else {
+				assert.NotContains(t, tc.claims, tc.claimName, "Claim should not be added")
+			}
+		})
+	}
 }
 
 func getTestPublicKey(t *testing.T) []byte {
