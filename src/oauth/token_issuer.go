@@ -10,9 +10,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/pchchv/aas/src/config"
+	"github.com/pchchv/aas/src/constants"
 	"github.com/pchchv/aas/src/database"
 	"github.com/pchchv/aas/src/enums"
 	"github.com/pchchv/aas/src/models"
+	"github.com/pchchv/aas/src/oidc"
 	"github.com/pkg/errors"
 )
 
@@ -147,4 +149,125 @@ func (t *TokenIssuer) generateIdToken(settings *models.Settings, code *models.Co
 	}
 
 	return
+}
+
+func (t *TokenIssuer) generateAccessToken(settings *models.Settings, code *models.Code, scope string,
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
+	claims := make(jwt.MapClaims)
+	claims["iss"] = settings.Issuer
+	claims["sub"] = code.User.Subject
+	claims["iat"] = now.Unix()
+	claims["auth_time"] = code.AuthenticatedAt.Unix()
+	claims["jti"] = uuid.New().String()
+	claims["acr"] = code.AcrLevel
+	claims["amr"] = code.AuthMethods
+	claims["sid"] = code.SessionIdentifier
+	scopes := strings.Split(scope, " ")
+	addUserInfoScope := false
+	audCollection := []string{}
+	for _, s := range scopes {
+		if oidc.IsIdTokenScope(s) {
+			// if an OIDC scope is present, give access to the userinfo endpoint
+			if !slices.Contains(audCollection, constants.AuthServerResourceIdentifier) {
+				audCollection = append(audCollection, constants.AuthServerResourceIdentifier)
+			}
+			addUserInfoScope = true
+			continue
+		}
+
+		if !oidc.IsOfflineAccessScope(s) {
+			parts := strings.Split(s, ":")
+			if len(parts) != 2 {
+				return "", "", errors.WithStack(fmt.Errorf("invalid scope: %v", s))
+			}
+			if !slices.Contains(audCollection, parts[0]) {
+				audCollection = append(audCollection, parts[0])
+			}
+		}
+	}
+
+	switch len(audCollection) {
+	case 0:
+		return "", "", errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
+	case 1:
+		claims["aud"] = audCollection[0]
+	default:
+		claims["aud"] = audCollection
+	}
+
+	if addUserInfoScope {
+		// if an OIDC scope is present, give access to the userinfo endpoint
+		userInfoScopeStr := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+		if !slices.Contains(scopes, userInfoScopeStr) {
+			scopes = append(scopes, userInfoScopeStr)
+		}
+		scope = strings.Join(scopes, " ")
+	}
+
+	claims["typ"] = enums.TokenTypeBearer.String()
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if code.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = code.Client.TokenExpirationInSeconds
+	}
+
+	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
+	claims["scope"] = scope
+	if len(code.Nonce) > 0 {
+		claims["nonce"] = code.Nonce
+	}
+
+	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
+	if code.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String() ||
+		code.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOff.String() {
+		includeOpenIDConnectClaimsInAccessToken = code.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String()
+	}
+
+	if slices.Contains(scopes, "openid") && includeOpenIDConnectClaimsInAccessToken {
+		t.addOpenIdConnectClaims(claims, code)
+	}
+
+	// groups
+	if slices.Contains(scopes, "groups") {
+		groups := []string{}
+		for _, group := range code.User.Groups {
+			if group.IncludeInAccessToken {
+				groups = append(groups, group.GroupIdentifier)
+			}
+		}
+
+		if len(groups) > 0 {
+			claims["groups"] = groups
+		}
+	}
+
+	// attributes
+	if slices.Contains(scopes, "attributes") {
+		attributes := map[string]string{}
+		for _, attribute := range code.User.Attributes {
+			if attribute.IncludeInAccessToken {
+				attributes[attribute.Key] = attribute.Value
+			}
+		}
+
+		for _, group := range code.User.Groups {
+			for _, attribute := range group.Attributes {
+				if attribute.IncludeInAccessToken {
+					attributes[attribute.Key] = attribute.Value
+				}
+			}
+		}
+
+		if len(attributes) > 0 {
+			claims["attributes"] = attributes
+		}
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = keyIdentifier
+	accessToken, err := token.SignedString(signingKey)
+	if err != nil {
+		return "", "", errors.Wrap(err, "unable to sign access_token")
+	}
+
+	return accessToken, scope, nil
 }
