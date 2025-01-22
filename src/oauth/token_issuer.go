@@ -115,6 +115,73 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context, code
 	return &tokenResponse, nil
 }
 
+func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, client *models.Client, scope string) (*TokenResponse, error) {
+	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+	var tokenResponse = TokenResponse{
+		TokenType: "Bearer",
+		ExpiresIn: int64(settings.TokenExpirationInSeconds),
+		Scope:     scope,
+	}
+
+	keyPair, err := t.database.GetCurrentSigningKey(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to parse private key from PEM")
+	}
+
+	now := time.Now().UTC()
+	claims := make(jwt.MapClaims)
+	scopes := strings.Split(scope, " ")
+
+	// access_token ---------------------------------------------------------------------------
+
+	claims["iss"] = settings.Issuer
+	claims["sub"] = client.ClientIdentifier
+	claims["iat"] = now.Unix()
+	claims["jti"] = uuid.New().String()
+	audCollection := []string{}
+	for _, scope := range scopes {
+		if oidc.IsIdTokenScope(scope) || oidc.IsOfflineAccessScope(scope) {
+			continue
+		}
+
+		parts := strings.Split(scope, ":")
+		if len(parts) != 2 {
+			return nil, errors.WithStack(fmt.Errorf("invalid scope: %v", scope))
+		}
+
+		if !slices.Contains(audCollection, parts[0]) {
+			audCollection = append(audCollection, parts[0])
+		}
+	}
+
+	switch len(audCollection) {
+	case 0:
+		return nil, errors.WithStack(fmt.Errorf("unable to generate an access token without an audience. scope: '%v'", scope))
+	case 1:
+		claims["aud"] = audCollection[0]
+	default:
+		claims["aud"] = audCollection
+	}
+
+	claims["typ"] = enums.TokenTypeBearer.String()
+	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
+	claims["scope"] = scope
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = keyPair.KeyIdentifier
+	accessToken, err := token.SignedString(privKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to sign access_token")
+	}
+
+	tokenResponse.AccessToken = accessToken
+	return &tokenResponse, nil
+}
+
 func (t *TokenIssuer) addClaimIfNotEmpty(claims jwt.MapClaims, claimName string, claimValue string) {
 	if len(strings.TrimSpace(claimValue)) > 0 {
 		claims[claimName] = claimValue
