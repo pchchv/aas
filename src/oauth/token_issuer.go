@@ -182,6 +182,87 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 	return &tokenResponse, nil
 }
 
+func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input *GenerateTokenForRefreshInput) (*TokenResponse, error) {
+	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+	if err := t.database.CodeLoadClient(nil, input.Code); err != nil {
+		return nil, err
+	}
+
+	scopeToUse := input.Code.Scope
+	if len(input.ScopeRequested) > 0 {
+		scopeToUse = input.ScopeRequested
+	}
+
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if input.Code.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = input.Code.Client.TokenExpirationInSeconds
+	}
+
+	var tokenResponse = TokenResponse{
+		TokenType: enums.TokenTypeBearer.String(),
+		ExpiresIn: int64(tokenExpirationInSeconds),
+	}
+
+	keyPair, err := t.database.GetCurrentSigningKey(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(keyPair.PrivateKeyPEM)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to parse private key from PEM")
+	}
+
+	now := time.Now().UTC()
+
+	// access_token -----------------------------------------------------------------------
+
+	if err = t.database.CodeLoadUser(nil, input.Code); err != nil {
+		return nil, err
+	}
+
+	if err = t.database.UserLoadGroups(nil, &input.Code.User); err != nil {
+		return nil, err
+	}
+
+	if err = t.database.GroupsLoadAttributes(nil, input.Code.User.Groups); err != nil {
+		return nil, err
+	}
+
+	if err = t.database.UserLoadAttributes(nil, &input.Code.User); err != nil {
+		return nil, err
+	}
+
+	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	tokenResponse.AccessToken = accessTokenStr
+	tokenResponse.Scope = scopeFromAccessToken
+
+	// id_token ---------------------------------------------------------------------------
+
+	scopes := strings.Split(scopeToUse, " ")
+	if slices.Contains(scopes, "openid") {
+		if idTokenStr, err := t.generateIdToken(settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier); err != nil {
+			return nil, err
+		} else {
+			tokenResponse.IdToken = idTokenStr
+		}
+	}
+
+	// refresh_token ----------------------------------------------------------------------
+
+	if refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, scopeFromAccessToken, now, privKey, keyPair.KeyIdentifier, input.RefreshToken); err != nil {
+		return nil, err
+	} else {
+		tokenResponse.RefreshToken = refreshToken
+		tokenResponse.RefreshExpiresIn = refreshExpiresIn
+	}
+
+	return &tokenResponse, nil
+}
+
 func (t *TokenIssuer) addClaimIfNotEmpty(claims jwt.MapClaims, claimName string, claimValue string) {
 	if len(strings.TrimSpace(claimValue)) > 0 {
 		claims[claimName] = claimValue
