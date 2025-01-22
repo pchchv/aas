@@ -1534,6 +1534,145 @@ func TestAddClaimIfNotEmpty(t *testing.T) {
 	}
 }
 
+func TestGetRefreshTokenExpiration(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	mockTokenParser := &TokenParser{}
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+
+	now := time.Now().UTC()
+	settings := &models.Settings{
+		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
+		UserSessionIdleTimeoutInSeconds:         1800,
+	}
+	client := &models.Client{
+		RefreshTokenOfflineIdleTimeoutInSeconds: 7200,
+	}
+
+	tests := []struct {
+		name               string
+		refreshTokenType   string
+		expectedExpiration int64
+		expectedError      bool
+	}{
+		{
+			name:               "Offline token with client override",
+			refreshTokenType:   "Offline",
+			expectedExpiration: now.Add(7200 * time.Second).Unix(),
+			expectedError:      false,
+		},
+		{
+			name:               "Offline token without client override",
+			refreshTokenType:   "Offline",
+			expectedExpiration: now.Add(3600 * time.Second).Unix(),
+			expectedError:      false,
+		},
+		{
+			name:               "Refresh token",
+			refreshTokenType:   "Refresh",
+			expectedExpiration: now.Add(1800 * time.Second).Unix(),
+			expectedError:      false,
+		},
+		{
+			name:               "Invalid token type",
+			refreshTokenType:   "Invalid",
+			expectedExpiration: 0,
+			expectedError:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.name == "Offline token without client override" {
+				client.RefreshTokenOfflineIdleTimeoutInSeconds = 0
+			}
+
+			exp, err := tokenIssuer.getRefreshTokenExpiration(tt.refreshTokenType, now, settings, client)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedExpiration, exp)
+			}
+		})
+	}
+}
+
+func TestGetRefreshTokenMaxLifetime(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	mockTokenParser := &TokenParser{}
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+
+	now := time.Now().UTC()
+	settings := &models.Settings{
+		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
+		UserSessionMaxLifetimeInSeconds:         43200,
+	}
+	client := &models.Client{
+		RefreshTokenOfflineMaxLifetimeInSeconds: 172800,
+	}
+	sessionIdentifier := "test-session-123"
+
+	tests := []struct {
+		name             string
+		refreshTokenType string
+		expectedLifetime int64
+		expectedError    bool
+		mockUserSession  *models.UserSession
+	}{
+		{
+			name:             "Offline token with client override",
+			refreshTokenType: "Offline",
+			expectedLifetime: now.Add(172800 * time.Second).Unix(),
+			expectedError:    false,
+		},
+		{
+			name:             "Offline token without client override",
+			refreshTokenType: "Offline",
+			expectedLifetime: now.Add(86400 * time.Second).Unix(),
+			expectedError:    false,
+		},
+		{
+			name:             "Refresh token",
+			refreshTokenType: "Refresh",
+			expectedLifetime: now.Add(43200 * time.Second).Unix(),
+			expectedError:    false,
+			mockUserSession: &models.UserSession{
+				Started: now,
+			},
+		},
+		{
+			name:             "Invalid token type",
+			refreshTokenType: "Invalid",
+			expectedLifetime: 0,
+			expectedError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.name == "Offline token without client override" {
+				client.RefreshTokenOfflineMaxLifetimeInSeconds = 0
+			}
+
+			if tt.mockUserSession != nil {
+				mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(tt.mockUserSession, nil)
+			}
+
+			maxLifetime, err := tokenIssuer.getRefreshTokenMaxLifetime(tt.refreshTokenType, now, settings, client, sessionIdentifier)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedLifetime, maxLifetime)
+			}
+
+			mockDB.AssertExpectations(t)
+		})
+	}
+}
+
 func getTestPublicKey(t *testing.T) []byte {
 	publicKeyBase64 := "LS0tLS1CRUdJTiBSU0EgUFVCTElDIEtFWS0tLS0tCk1JSUNJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBZzhBTUlJQ0NnS0NBZ0VBb2Q3dFRUeVlCUjI0aDg1WEZaUkcKcUg4QXNuRTBXVHliRFZELzRYajdWSHY3RWErclU1S2cyVFdKNjhkL09BcCtNK1lMYnVMYXdIVk1mWWtQM0lhWgpTR1d6cHdCVXhxc0lmWTlLbEdaWjN3aGJIWi9EZWRCU2I1UjNkdnJjUEIvQmcrMkFucUVnRkV2N3Y4djZFT1psClJNU0RxR0t2VEU0a083UUFUR0JZbUJoTDZmNytPUnlRRmNLdUFZZ29DZmlKOG1hb3FkK1dIREk5TWMyTlBncncKMzhOaW1mQ3ZFM3VWbXljdFFyMDN3TTAyT1A0M0IyS3pCdUREc2ZKdUZWSVFWTUVtU2IyQ2ZqMjloWkpGMCtJWgpVZWYvVHhXQTZyVWpTK1pYSGtudXlYNDBVb1pYYUFJVU5zbUVEeVUxWHRKRTh5Ym1xSHdNK3BjT2dCSzh3TElXCk5LVkVFSDVtMjBsaStqMjdnSThvcVlNamJCYjdyYlI1L2JnSmdjL05qU2c4bTZrZDJzVC9TSmltMlI2eENFOEgKeVdTbEdvQkxIZTlSQUJYcUR4UTg5RCtiTGRRb1V5R1N2RVJVWXBBNzZYNGViY2tqdnR0UFl3cTFSWEZuS0VzbwpoUTQ0SVFySEFMTTRmcTQyRXF2WkZvTUxQVmhvT0xOSWd2NUlhU1lHZm9IMW1uQlZPZkJzZ3B4ejk0czRCNTJyCjFNcE5GaE1qaG1SSXBCcWYvSHNPalNtM05mUG1pYkVVQ0c2OEo3aSthU3ZvVTdwSnVZQzgyQW1TWmwxeWxLOTcKRjRUUG1RaGJUNG5yMlZxMS9oMGpwQUIzNW5DUS9tM09Sckl6RXYzL0F0UEdnbktlWENML3M0ZUQzd2hzbkNaTAowVmVMNmVFYWhoUFYydW05VlZzeVowVUNBd0VBQVE9PQotLS0tLUVORCBSU0EgUFVCTElDIEtFWS0tLS0tCg=="
 	publicKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyBase64)
