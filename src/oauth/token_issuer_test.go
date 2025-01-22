@@ -2,8 +2,11 @@ package oauth
 
 import (
 	"encoding/base64"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,4 +24,24 @@ func getTestPrivateKey(t *testing.T) []byte {
 	assert.NoError(t, err)
 
 	return privateKeyBytes
+}
+
+func verifyAndDecodeToken(t *testing.T, tokenString string, publicKeyBytes []byte) jwt.MapClaims {
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwt.ParseRSAPublicKeyFromPEM(publicKeyBytes)
+	}, jwt.WithExpirationRequired())
+	assert.NoError(t, err)
+	assert.True(t, token.Valid)
+	return claims
+}
+
+func assertTimeClaimWithinRange(t *testing.T, claims jwt.MapClaims, claimName string, expectedDuration time.Duration, message string) {
+	assert.Contains(t, claims, claimName)
+	claimUnix := claims[claimName].(float64)
+	claimTime := time.Unix(int64(claimUnix), 0)
+	expectedTime := time.Now().UTC().Add(expectedDuration)
+	start := expectedTime.Add(-3 * time.Second)
+	end := expectedTime.Add(3 * time.Second)
+	assert.True(t, claimTime.After(start) && claimTime.Before(end), fmt.Sprintf("%s: %s", message, claimTime))
 }
