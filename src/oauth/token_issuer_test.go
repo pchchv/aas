@@ -1114,6 +1114,169 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	mockDB.AssertExpectations(t)
 }
 
+func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	mockTokenParser := &TokenParser{}
+	tokenIssuer := NewTokenIssuer(mockDB, mockTokenParser)
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
+	}
+
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	now := time.Now().UTC()
+	sub := uuid.New()
+	sessionIdentifier := "test-session-offline"
+	config.Get().BaseURL = "http://localhost:8081"
+
+	privateKeyBytes := getTestPrivateKey(t)
+	publicKeyBytes := getTestPublicKey(t)
+
+	code := &models.Code{
+		Id:                1,
+		ClientId:          1,
+		UserId:            1,
+		Scope:             "openid profile offline_access",
+		Nonce:             "test-nonce-offline",
+		AuthenticatedAt:   now.Add(-10 * time.Minute),
+		SessionIdentifier: sessionIdentifier,
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthMethods:       "pwd",
+	}
+	client := &models.Client{
+		Id:                                      1,
+		ClientIdentifier:                        "test-client-offline",
+		TokenExpirationInSeconds:                1200,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 7200,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 172800,
+	}
+	user := &models.User{
+		Id:            1,
+		Subject:       sub,
+		Email:         "test@example.com",
+		EmailVerified: true,
+		Username:      "testuser",
+		GivenName:     "Test",
+		FamilyName:    "User",
+		UpdatedAt:     sql.NullTime{Time: now.Add(-2 * time.Hour), Valid: true},
+	}
+
+	refreshToken := &models.RefreshToken{
+		Id:                   1,
+		RefreshTokenJti:      "existing-jti-offline",
+		FirstRefreshTokenJti: "first-jti-offline",
+		MaxLifetime:          sql.NullTime{Time: now.Add(48 * time.Hour), Valid: true},
+	}
+
+	refreshTokenInfo := &Jwt{
+		Claims: jwt.MapClaims{
+			"jti":    "existing-jti-offline",
+			"scope":  "openid profile offline_access",
+			"exp":    now.Add(2 * time.Hour).Unix(),
+			"iat":    now.Add(-1 * time.Hour).Unix(),
+			"iss":    "https://test-issuer.com",
+			"aud":    "https://test-issuer.com",
+			"sub":    sub.String(),
+			"typ":    "Offline",
+			"client": client.ClientIdentifier,
+		},
+	}
+
+	mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
+	code.Client = *client
+	mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+	code.User = *user
+	mockDB.On("UserLoadGroups", mock.Anything, &code.User).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, code.User.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, &code.User).Return(nil)
+	var capturedRefreshToken *models.RefreshToken
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).
+		Run(func(args mock.Arguments) {
+			capturedRefreshToken = args.Get(1).(*models.RefreshToken)
+		}).
+		Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: privateKeyBytes,
+	}, nil)
+
+	input := &GenerateTokenForRefreshInput{
+		Code:             code,
+		ScopeRequested:   "resource1:write offline_access",
+		RefreshToken:     refreshToken,
+		RefreshTokenInfo: refreshTokenInfo,
+	}
+
+	response, err := tokenIssuer.GenerateTokenResponseForRefresh(ctx, input)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Equal(t, "Bearer", response.TokenType)
+	assert.Equal(t, int64(1200), response.ExpiresIn)
+	assert.NotEmpty(t, response.AccessToken)
+	assert.Empty(t, response.IdToken)
+	assert.NotEmpty(t, response.RefreshToken)
+	assert.Equal(t, "resource1:write offline_access", response.Scope)
+	assert.Equal(t, int64(7200), response.RefreshExpiresIn)
+
+	// validate Access token --------------------------------------------
+
+	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+	assert.Equal(t, settings.Issuer, accessClaims["iss"])
+	assert.Equal(t, user.Subject.String(), accessClaims["sub"])
+	assert.Equal(t, "resource1", accessClaims["aud"])
+	assert.Equal(t, code.Nonce, accessClaims["nonce"])
+	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
+	assert.Equal(t, code.AuthMethods, accessClaims["amr"])
+	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
+	assert.Equal(t, "Bearer", accessClaims["typ"])
+	assert.Equal(t, "resource1:write offline_access", accessClaims["scope"])
+	assertTimeClaimWithinRange(t, accessClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, accessClaims, "exp", 1200*time.Second, "exp should be 1200 seconds from now")
+	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -600*time.Second, "auth_time should be 600 seconds ago")
+	_, err = uuid.Parse(accessClaims["jti"].(string))
+	assert.NoError(t, err, "Access token jti should be a valid UUID")
+
+	// validate Refresh token --------------------------------------------
+
+	refreshClaims := verifyAndDecodeToken(t, response.RefreshToken, publicKeyBytes)
+	assert.Equal(t, user.Subject.String(), refreshClaims["sub"])
+	assert.Equal(t, settings.Issuer, refreshClaims["aud"])
+	assert.Equal(t, settings.Issuer, refreshClaims["iss"])
+	assert.Equal(t, "Offline", refreshClaims["typ"])
+	assert.Equal(t, "resource1:write offline_access", refreshClaims["scope"])
+	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
+	assertTimeClaimWithinRange(t, refreshClaims, "exp", 7200*time.Second, "exp should be 7200 seconds from now")
+	assertTimeClaimWithinRange(t, refreshClaims, "offline_access_max_lifetime", 172800*time.Second, "offline_access_max_lifetime should be 172800 seconds from now")
+	_, err = uuid.Parse(refreshClaims["jti"].(string))
+	assert.NoError(t, err, "Refresh token jti should be a valid UUID")
+
+	// validate Refresh token passed to CreateRefreshToken --------------------------------------------
+
+	assert.NotNil(t, capturedRefreshToken)
+	assert.Equal(t, code.Id, capturedRefreshToken.CodeId)
+	assert.NotEmpty(t, capturedRefreshToken.RefreshTokenJti)
+	assert.Equal(t, refreshToken.FirstRefreshTokenJti, capturedRefreshToken.FirstRefreshTokenJti)
+	assert.Equal(t, refreshToken.RefreshTokenJti, capturedRefreshToken.PreviousRefreshTokenJti)
+	assert.Equal(t, "Offline", capturedRefreshToken.RefreshTokenType)
+	assert.Equal(t, "resource1:write offline_access", capturedRefreshToken.Scope)
+	assert.Empty(t, capturedRefreshToken.SessionIdentifier)
+	assert.False(t, capturedRefreshToken.Revoked)
+	assert.True(t, capturedRefreshToken.IssuedAt.Valid)
+	assert.WithinDuration(t, now, capturedRefreshToken.IssuedAt.Time, 1*time.Second)
+	assert.True(t, capturedRefreshToken.ExpiresAt.Valid)
+	assert.WithinDuration(t, now.Add(7200*time.Second), capturedRefreshToken.ExpiresAt.Time, 1*time.Second)
+	assert.True(t, capturedRefreshToken.MaxLifetime.Valid)
+	assert.WithinDuration(t, now.Add(172800*time.Second), capturedRefreshToken.MaxLifetime.Time, 1*time.Second)
+
+	mockDB.AssertExpectations(t)
+}
+
 func getTestPublicKey(t *testing.T) []byte {
 	publicKeyBase64 := "LS0tLS1CRUdJTiBSU0EgUFVCTElDIEtFWS0tLS0tCk1JSUNJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBZzhBTUlJQ0NnS0NBZ0VBb2Q3dFRUeVlCUjI0aDg1WEZaUkcKcUg4QXNuRTBXVHliRFZELzRYajdWSHY3RWErclU1S2cyVFdKNjhkL09BcCtNK1lMYnVMYXdIVk1mWWtQM0lhWgpTR1d6cHdCVXhxc0lmWTlLbEdaWjN3aGJIWi9EZWRCU2I1UjNkdnJjUEIvQmcrMkFucUVnRkV2N3Y4djZFT1psClJNU0RxR0t2VEU0a083UUFUR0JZbUJoTDZmNytPUnlRRmNLdUFZZ29DZmlKOG1hb3FkK1dIREk5TWMyTlBncncKMzhOaW1mQ3ZFM3VWbXljdFFyMDN3TTAyT1A0M0IyS3pCdUREc2ZKdUZWSVFWTUVtU2IyQ2ZqMjloWkpGMCtJWgpVZWYvVHhXQTZyVWpTK1pYSGtudXlYNDBVb1pYYUFJVU5zbUVEeVUxWHRKRTh5Ym1xSHdNK3BjT2dCSzh3TElXCk5LVkVFSDVtMjBsaStqMjdnSThvcVlNamJCYjdyYlI1L2JnSmdjL05qU2c4bTZrZDJzVC9TSmltMlI2eENFOEgKeVdTbEdvQkxIZTlSQUJYcUR4UTg5RCtiTGRRb1V5R1N2RVJVWXBBNzZYNGViY2tqdnR0UFl3cTFSWEZuS0VzbwpoUTQ0SVFySEFMTTRmcTQyRXF2WkZvTUxQVmhvT0xOSWd2NUlhU1lHZm9IMW1uQlZPZkJzZ3B4ejk0czRCNTJyCjFNcE5GaE1qaG1SSXBCcWYvSHNPalNtM05mUG1pYkVVQ0c2OEo3aSthU3ZvVTdwSnVZQzgyQW1TWmwxeWxLOTcKRjRUUG1RaGJUNG5yMlZxMS9oMGpwQUIzNW5DUS9tM09Sckl6RXYzL0F0UEdnbktlWENML3M0ZUQzd2hzbkNaTAowVmVMNmVFYWhoUFYydW05VlZzeVowVUNBd0VBQVE9PQotLS0tLUVORCBSU0EgUFVCTElDIEtFWS0tLS0tCg=="
 	publicKeyBytes, err := base64.StdEncoding.DecodeString(publicKeyBase64)
