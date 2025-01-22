@@ -1,14 +1,19 @@
 package oauth
 
 import (
+	"crypto/rsa"
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/pchchv/aas/src/config"
 	"github.com/pchchv/aas/src/database"
+	"github.com/pchchv/aas/src/enums"
 	"github.com/pchchv/aas/src/models"
+	"github.com/pkg/errors"
 )
 
 type GenerateTokenForRefreshInput struct {
@@ -72,4 +77,74 @@ func (t *TokenIssuer) addOpenIdConnectClaims(claims jwt.MapClaims, code *models.
 		t.addClaimIfNotEmpty(claims, "phone_number", code.User.PhoneNumber)
 		claims["phone_number_verified"] = code.User.PhoneNumberVerified
 	}
+}
+
+func (t *TokenIssuer) generateIdToken(settings *models.Settings, code *models.Code, scope string,
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (idToken string, err error) {
+	claims := make(jwt.MapClaims)
+	claims["iss"] = settings.Issuer
+	claims["sub"] = code.User.Subject
+	claims["iat"] = now.Unix()
+	claims["auth_time"] = code.AuthenticatedAt.Unix()
+	claims["jti"] = uuid.New().String()
+	claims["acr"] = code.AcrLevel
+	claims["amr"] = code.AuthMethods
+	claims["sid"] = code.SessionIdentifier
+	scopes := strings.Split(scope, " ")
+	claims["aud"] = code.Client.ClientIdentifier
+	claims["typ"] = enums.TokenTypeId.String()
+	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
+	if code.Client.TokenExpirationInSeconds > 0 {
+		tokenExpirationInSeconds = code.Client.TokenExpirationInSeconds
+	}
+
+	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
+	if len(code.Nonce) > 0 {
+		claims["nonce"] = code.Nonce
+	}
+	t.addOpenIdConnectClaims(claims, code)
+
+	// groups
+	if slices.Contains(scopes, "groups") {
+		groups := []string{}
+		for _, group := range code.User.Groups {
+			if group.IncludeInIdToken {
+				groups = append(groups, group.GroupIdentifier)
+			}
+		}
+
+		if len(groups) > 0 {
+			claims["groups"] = groups
+		}
+	}
+
+	// attributes
+	if slices.Contains(scopes, "attributes") {
+		attributes := map[string]string{}
+		for _, attribute := range code.User.Attributes {
+			if attribute.IncludeInIdToken {
+				attributes[attribute.Key] = attribute.Value
+			}
+		}
+
+		for _, group := range code.User.Groups {
+			for _, attribute := range group.Attributes {
+				if attribute.IncludeInIdToken {
+					attributes[attribute.Key] = attribute.Value
+				}
+			}
+		}
+
+		if len(attributes) > 0 {
+			claims["attributes"] = attributes
+		}
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = keyIdentifier
+	if idToken, err = token.SignedString(signingKey); err != nil {
+		return "", errors.Wrap(err, "unable to sign id_token")
+	}
+
+	return
 }
