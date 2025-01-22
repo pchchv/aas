@@ -271,3 +271,43 @@ func (t *TokenIssuer) generateAccessToken(settings *models.Settings, code *model
 
 	return accessToken, scope, nil
 }
+
+func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now time.Time, settings *models.Settings, client *models.Client) (int64, error) {
+	if refreshTokenType == "Offline" {
+		refreshTokenExpirationInSeconds := settings.RefreshTokenOfflineIdleTimeoutInSeconds
+		if client.RefreshTokenOfflineIdleTimeoutInSeconds > 0 {
+			refreshTokenExpirationInSeconds = client.RefreshTokenOfflineIdleTimeoutInSeconds
+		}
+
+		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
+		return exp, nil
+	} else if refreshTokenType == "Refresh" {
+		refreshTokenExpirationInSeconds := settings.UserSessionIdleTimeoutInSeconds
+		exp := now.Add(time.Duration(time.Second * time.Duration(refreshTokenExpirationInSeconds))).Unix()
+		return exp, nil
+	}
+
+	return 0, errors.WithStack(fmt.Errorf("invalid refresh token type: %v", refreshTokenType))
+}
+
+func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now time.Time, settings *models.Settings, client *models.Client, sessionIdentifier string) (int64, error) {
+	if refreshTokenType == "Offline" {
+		maxLifetimeInSeconds := settings.RefreshTokenOfflineMaxLifetimeInSeconds
+		if client.RefreshTokenOfflineMaxLifetimeInSeconds > 0 {
+			maxLifetimeInSeconds = client.RefreshTokenOfflineMaxLifetimeInSeconds
+		}
+
+		maxLifetime := now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
+		return maxLifetime, nil
+	} else if refreshTokenType == "Refresh" {
+		userSession, err := t.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+		if err != nil {
+			return 0, err
+		}
+
+		maxLifetime := userSession.Started.Add(time.Duration(time.Second * time.Duration(settings.UserSessionMaxLifetimeInSeconds))).Unix()
+		return maxLifetime, nil
+	}
+
+	return 0, errors.WithStack(fmt.Errorf("invalid refresh token type: %v", refreshTokenType))
+}
