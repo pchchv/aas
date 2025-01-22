@@ -2,6 +2,7 @@ package oauth
 
 import (
 	"crypto/rsa"
+	"database/sql"
 	"fmt"
 	"slices"
 	"strings"
@@ -310,4 +311,99 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 	}
 
 	return 0, errors.WithStack(fmt.Errorf("invalid refresh token type: %v", refreshTokenType))
+}
+
+func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *models.Code, scope string, now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, refreshToken *models.RefreshToken) (string, int64, error) {
+	claims := make(jwt.MapClaims)
+	jti := uuid.New().String()
+	claims["iss"] = settings.Issuer
+	claims["iat"] = now.Unix()
+	claims["jti"] = jti
+	claims["aud"] = settings.Issuer
+	claims["sub"] = code.User.Subject
+	scopes := strings.Split(scope, " ")
+	if slices.Contains(scopes, oidc.OfflineAccessScope) {
+		// offline refresh token (not related to user session)
+		claims["typ"] = "Offline"
+		exp, err := t.getRefreshTokenExpiration("Offline", now, settings, &code.Client)
+		if err != nil {
+			return "", 0, err
+		}
+
+		maxLifetime, err := t.getRefreshTokenMaxLifetime("Offline", now, settings, &code.Client, code.SessionIdentifier)
+		if err != nil {
+			return "", 0, err
+		}
+
+		if refreshToken != nil {
+			// if we are refreshing a refresh token, we need to use the max lifetime of the original refresh token
+			maxLifetime = refreshToken.MaxLifetime.Time.Unix()
+		}
+		claims["offline_access_max_lifetime"] = maxLifetime
+
+		if exp < maxLifetime {
+			claims["exp"] = exp
+		} else {
+			claims["exp"] = maxLifetime
+		}
+	} else {
+		// normal refresh token (associated with user session)
+		claims["typ"] = "Refresh"
+		claims["sid"] = code.SessionIdentifier
+		exp, err := t.getRefreshTokenExpiration("Refresh", now, settings, &code.Client)
+		if err != nil {
+			return "", 0, err
+		}
+
+		maxLifetime, err := t.getRefreshTokenMaxLifetime("Refresh", now, settings, &code.Client, code.SessionIdentifier)
+		if err != nil {
+			return "", 0, err
+		}
+
+		if exp < maxLifetime {
+			claims["exp"] = exp
+		} else {
+			claims["exp"] = maxLifetime
+		}
+	}
+	claims["scope"] = scope
+
+	// save 1st refresh token
+	refreshTokenEntity := &models.RefreshToken{
+		RefreshTokenJti:  jti,
+		IssuedAt:         sql.NullTime{Time: now, Valid: true},
+		ExpiresAt:        sql.NullTime{Time: time.Unix(claims["exp"].(int64), 0), Valid: true},
+		CodeId:           code.Id,
+		RefreshTokenType: claims["typ"].(string),
+		Scope:            claims["scope"].(string),
+		Revoked:          false,
+	}
+	if refreshToken != nil {
+		refreshTokenEntity.PreviousRefreshTokenJti = refreshToken.RefreshTokenJti
+		refreshTokenEntity.FirstRefreshTokenJti = refreshToken.FirstRefreshTokenJti
+	} else {
+		// first refresh token issued
+		refreshTokenEntity.FirstRefreshTokenJti = jti
+	}
+
+	if slices.Contains(scopes, oidc.OfflineAccessScope) {
+		t := time.Unix(claims["offline_access_max_lifetime"].(int64), 0)
+		refreshTokenEntity.MaxLifetime = sql.NullTime{Time: t, Valid: true}
+	} else {
+		refreshTokenEntity.SessionIdentifier = claims["sid"].(string)
+	}
+
+	if err := t.database.CreateRefreshToken(nil, refreshTokenEntity); err != nil {
+		return "", 0, err
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = keyIdentifier
+	rt, err := token.SignedString(signingKey)
+	if err != nil {
+		return "", 0, errors.Wrap(err, "unable to sign refresh_token")
+	}
+	refreshExpiresIn := claims["exp"].(int64) - now.Unix()
+
+	return rt, refreshExpiresIn, nil
 }
