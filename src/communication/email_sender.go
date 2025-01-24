@@ -5,3 +5,9 @@ type SendEmailInput struct {
 	Subject  string
 	HtmlBody string
 }
+
+type EmailSender struct{}
+
+func NewEmailSender() *EmailSender {
+	return &EmailSender{}
+}
