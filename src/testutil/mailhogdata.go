@@ -33,3 +33,20 @@ type Content struct {
 	Size    int     `json:"Size"`
 	Mime    any     `json:"MIME"`
 }
+
+type Raw struct {
+	From string   `json:"From"`
+	To   []string `json:"To"`
+	Data string   `json:"Data"`
+	Helo string   `json:"Helo"`
+}
+
+type Item struct {
+	ID      string    `json:"ID"`
+	From    From      `json:"From"`
+	To      To        `json:"To"`
+	Content Content   `json:"Content"`
+	Created time.Time `json:"Created"`
+	Mime    any       `json:"MIME"`
+	Raw     Raw       `json:"Raw"`
+}
