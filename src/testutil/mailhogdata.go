@@ -1,5 +1,7 @@
 package testutil
 
+import "time"
+
 type From struct {
 	Relays  any    `json:"Relays"`
 	Mailbox string `json:"Mailbox"`
@@ -49,4 +51,11 @@ type Item struct {
 	Created time.Time `json:"Created"`
 	Mime    any       `json:"MIME"`
 	Raw     Raw       `json:"Raw"`
+}
+
+type MailhogData struct {
+	Total int    `json:"total"`
+	Count int    `json:"count"`
+	Start int    `json:"start"`
+	Items []Item `json:"items"`
 }
