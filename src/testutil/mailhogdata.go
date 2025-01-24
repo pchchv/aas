@@ -1,6 +1,16 @@
 package testutil
 
-import "time"
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 type From struct {
 	Relays  any    `json:"Relays"`
@@ -58,4 +68,25 @@ type MailhogData struct {
 	Count int    `json:"count"`
 	Start int    `json:"start"`
 	Items []Item `json:"items"`
+}
+
+func AssertEmailSent(t *testing.T, to string, containing string) {
+	destUrl := "http://mailhog:8025/api/v2/search?kind=to&query=" + to
+	resp, err := http.Get(destUrl)
+	require.NoError(t, err, "Failed to send GET request")
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err, "Failed to read response body")
+
+	var mailhogData MailhogData
+	err = json.Unmarshal(body, &mailhogData)
+	require.NoError(t, err, "Failed to unmarshal JSON")
+	assert.Equal(t, 1, len(mailhogData.Items), "expecting to find 1 email")
+	if len(mailhogData.Items) > 0 {
+		assert.True(t, strings.Contains(mailhogData.Items[0].Content.Headers.To[0], to))
+		assert.True(t, strings.Contains(mailhogData.Items[0].Content.Body, containing))
+	} else {
+		t.Errorf("No emails found for recipient: %s", to)
+	}
 }
