@@ -18,7 +18,10 @@ require (
 	modernc.org/sqlite v1.34.5
 )
 
-require github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
+require (
+	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
+	github.com/toorop/go-dkim v0.0.0-20201103131630-e1cd1a0a5208 // indirect
+)
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
@@ -66,6 +69,7 @@ require (
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/vektra/mockery v1.1.2 // indirect
 	github.com/vektra/mockery/v2 v2.51.1 // indirect
+	github.com/xhit/go-simple-mail/v2 v2.16.0
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
