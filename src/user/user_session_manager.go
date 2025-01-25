@@ -2,8 +2,10 @@ package user
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -117,4 +119,86 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	}
 
 	return userSession, nil
+}
+
+func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64) (*models.UserSession, error) {
+	userSession, err := u.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+	if err != nil {
+		return nil, err
+	}
+
+	if userSession != nil {
+		if err = u.database.UserSessionLoadClients(nil, userSession); err != nil {
+			return nil, err
+		}
+
+		utcNow := time.Now().UTC()
+		userSession.LastAccessed = utcNow
+		// concatenate any new IP address
+		ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
+		if len(ipWithoutPort) == 0 {
+			ipWithoutPort = r.RemoteAddr
+		}
+
+		if !strings.Contains(userSession.IpAddress, ipWithoutPort) {
+			userSession.IpAddress = fmt.Sprintf("%v,%v", userSession.IpAddress, ipWithoutPort)
+		}
+
+		// append client if not already present
+		clientFound := false
+		for _, c := range userSession.Clients {
+			if c.ClientId == clientId {
+				clientFound = true
+				break
+			}
+		}
+
+		if clientFound {
+			// update last accessed
+			for i, c := range userSession.Clients {
+				if c.ClientId == clientId {
+					userSession.Clients[i].LastAccessed = utcNow
+					break
+				}
+			}
+		} else {
+			userSession.Clients = append(userSession.Clients, models.UserSessionClient{
+				Started:      utcNow,
+				LastAccessed: utcNow,
+				ClientId:     clientId,
+			})
+		}
+
+		tx, err := u.database.BeginTransaction()
+		if err != nil {
+			return nil, err
+		}
+		defer u.database.RollbackTransaction(tx) //nolint:errcheck
+
+		if err = u.database.UpdateUserSession(tx, userSession); err != nil {
+			return nil, err
+		}
+
+		for _, client := range userSession.Clients {
+			if client.Id > 0 {
+				if err = u.database.UpdateUserSessionClient(tx, &client); err != nil {
+					return nil, err
+				}
+			} else {
+				// insert new
+				client.UserSessionId = userSession.Id
+				if err = u.database.CreateUserSessionClient(tx, &client); err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		if err = u.database.CommitTransaction(tx); err != nil {
+			return nil, err
+		}
+
+		return userSession, nil
+	}
+
+	return nil, errors.WithStack(errors.New("Unexpected: can't bump user session because user session is nil"))
 }
