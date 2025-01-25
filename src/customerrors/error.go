@@ -1,4 +1,5 @@
 package customerrors
+
 import "fmt"
 
 type ErrorDetail struct {
@@ -25,4 +26,23 @@ func NewErrorDetailWithHttpStatusCode(code string, description string, httpStatu
 	return &ErrorDetail{
 		details: details,
 	}
+}
+
+func (e *ErrorDetail) IsError(target *ErrorDetail) bool {
+	if target == nil {
+		return false
+	}
+
+	if len(e.details) != len(target.details) {
+		return false
+	}
+
+	for key, value := range e.details {
+		targetValue, exists := target.details[key]
+		if !exists || value != targetValue {
+			return false
+		}
+	}
+
+	return true
 }
