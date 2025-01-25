@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+var ErrNoAuthContext = NewErrorDetail("no_auth_context", "no auth context in session")
+
 type ErrorDetail struct {
 	details map[string]string
 }
@@ -72,4 +74,26 @@ func (e *ErrorDetail) Error() string {
 	}
 
 	return sb.String()
+}
+
+func (e *ErrorDetail) GetCode() string {
+	return e.details["code"]
+}
+
+func (e *ErrorDetail) GetDescription() string {
+	return e.details["description"]
+}
+
+func (e *ErrorDetail) GetHttpStatusCode() int {
+	statusCode := e.details["httpStatusCode"]
+	if statusCode == "" {
+		return 0
+	}
+
+	var httpStatusCode int
+	if _, err := fmt.Sscanf(statusCode, "%d", &httpStatusCode); err != nil {
+		return 0
+	}
+
+	return httpStatusCode
 }
