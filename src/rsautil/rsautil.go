@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func EncodePrivateKeyToPEM(privateKey *rsa.PrivateKey) (privatePEM []byte) {
+func EncodePrivateKeyToPEM(privateKey *rsa.PrivateKey) []byte {
 	// ASN.1 DER format
 	privDER := x509.MarshalPKCS1PrivateKey(privateKey)
 	// pem.Block
@@ -21,9 +21,8 @@ func EncodePrivateKeyToPEM(privateKey *rsa.PrivateKey) (privatePEM []byte) {
 		Headers: nil,
 		Bytes:   privDER,
 	}
-	privatePEM = pem.EncodeToMemory(&privBlock)
 
-	return
+	return pem.EncodeToMemory(&privBlock)
 }
 
 func EncodePublicKeyToPEM(publicKey *rsa.PublicKey) (pubkey_pem []byte, err error) {
