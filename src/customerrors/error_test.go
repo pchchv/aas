@@ -79,3 +79,43 @@ func TestNewErrorDetailWithHttpStatusCode_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestErrorDetail_Error(t *testing.T) {
+	code := "E003"
+	description := "Test error string"
+	httpStatusCode := 500
+	errorDetail := NewErrorDetailWithHttpStatusCode(code, description, httpStatusCode)
+	expectedError := "code: E003; description: Test error string; httpStatusCode: 500"
+	if errorDetail.Error() != expectedError {
+		t.Errorf("Expected error string %s, got %s", expectedError, errorDetail.Error())
+	}
+}
+
+func TestErrorDetail_Error_OnlyDetailIsAvailable(t *testing.T) {
+	errorDetail := NewErrorDetail("", "Test error string")
+	expectedError := "Test error string"
+	if errorDetail.Error() != expectedError {
+		t.Errorf("Expected error string %s, got %s", expectedError, errorDetail.Error())
+	}
+}
+
+func TestErrorDetail_GetHttpStatusCode_Invalid(t *testing.T) {
+	errorDetail := &ErrorDetail{
+		details: map[string]string{
+			"code":           "E004",
+			"description":    "Invalid HTTP status code",
+			"httpStatusCode": "invalid",
+		},
+	}
+
+	if errorDetail.GetHttpStatusCode() != 0 {
+		t.Errorf("Expected HTTP status code 0 for invalid input, got %d", errorDetail.GetHttpStatusCode())
+	}
+}
+
+func TestErrorDetail_GetHttpStatusCode_Missing(t *testing.T) {
+	errorDetail := NewErrorDetail("E005", "Missing HTTP status code")
+	if errorDetail.GetHttpStatusCode() != 0 {
+		t.Errorf("Expected HTTP status code 0 for missing status code, got %d", errorDetail.GetHttpStatusCode())
+	}
+}
