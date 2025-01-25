@@ -5,6 +5,7 @@ import (
 
 	"github.com/pchchv/aas/src/database"
 	"github.com/pchchv/aas/src/models"
+	"github.com/pchchv/aas/src/oidc"
 	"github.com/pkg/errors"
 )
 
@@ -93,4 +94,32 @@ func (pc *PermissionChecker) UserHasScopePermission(userId int64, scope string) 
 	}
 
 	return groupHasPermission, nil
+}
+
+func (pc *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(scope string, user *models.User) (string, error) {
+	if user == nil {
+		return "", errors.WithStack(errors.New("user is nil"))
+	}
+
+	var newScope string
+	for _, scopeStr := range strings.Split(scope, " ") {
+		if scopeStr != "" {
+			if oidc.IsIdTokenScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
+				newScope += scopeStr + " "
+			} else {
+				parts := strings.Split(scopeStr, ":")
+				if len(parts) != 2 {
+					return "", errors.WithStack(errors.New("invalid scope format: " + scopeStr))
+				} else {
+					if userHasPermission, err := pc.UserHasScopePermission(user.Id, scopeStr); err != nil {
+						return "", err
+					} else if userHasPermission {
+						newScope += scopeStr + " "
+					}
+				}
+			}
+		}
+	}
+
+	return strings.TrimSpace(newScope), nil
 }
