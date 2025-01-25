@@ -1,6 +1,10 @@
 package customerrors
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
 
 type ErrorDetail struct {
 	details map[string]string
@@ -45,4 +49,27 @@ func (e *ErrorDetail) IsError(target *ErrorDetail) bool {
 	}
 
 	return true
+}
+
+func (e *ErrorDetail) Error() string {
+	if e.details["code"] == "" && e.details["httpStatusCode"] == "" {
+		return e.details["description"]
+	}
+
+	keys := make([]string, 0, len(e.details))
+	for k := range e.details {
+		keys = append(keys, k)
+	}
+
+	sort.Strings(keys)
+
+	var sb strings.Builder
+	for _, key := range keys {
+		if sb.Len() > 0 {
+			sb.WriteString("; ")
+		}
+		sb.WriteString(fmt.Sprintf("%v: %v", key, e.details[key]))
+	}
+
+	return sb.String()
 }
