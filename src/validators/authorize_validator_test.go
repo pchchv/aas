@@ -135,3 +135,107 @@ func TestValidateScopes_MaximumNumberOfScopes(t *testing.T) {
 	err := validator.ValidateScopes(scope)
 	assert.NoError(t, err)
 }
+
+func TestValidateRequest_InvalidResponseType(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+	input := ValidateRequestInput{
+		ResponseType:        "token",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       "valid_challenge",
+	}
+
+	err := validator.ValidateRequest(&input)
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "Ensure response_type is set to 'code' as it's the only supported value.", customErr.GetDescription())
+}
+
+func TestValidateRequest_InvalidCodeChallengeMethod(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "plain",
+		CodeChallenge:       "valid_challenge",
+	}
+
+	err := validator.ValidateRequest(&input)
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "PKCE is required. Ensure code_challenge_method is set to 'S256'.", customErr.GetDescription())
+}
+
+func TestValidateRequest_CodeChallengeTooShort(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       "short",
+	}
+
+	err := validator.ValidateRequest(&input)
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", customErr.GetDescription())
+}
+
+func TestValidateRequest_CodeChallengeTooLong(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       string(make([]byte, 129)),
+	}
+
+	err := validator.ValidateRequest(&input)
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", customErr.GetDescription())
+}
+
+func TestValidateRequest_InvalidResponseMode(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:        "invalid_mode",
+	}
+
+	err := validator.ValidateRequest(&input)
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "Invalid response_mode parameter. Supported values are: query, fragment, form_post.", customErr.GetDescription())
+}
+
+func TestValidateRequest_ValidInput(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:        "query",
+	}
+
+	err := validator.ValidateRequest(&input)
+	assert.NoError(t, err)
+}
+
+func TestValidateRequest_EmptyResponseMode(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+	input := ValidateRequestInput{
+		ResponseType:        "code",
+		CodeChallengeMethod: "S256",
+		CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
+		ResponseMode:        "",
+	}
+
+	err := validator.ValidateRequest(&input)
+	assert.NoError(t, err)
+}
