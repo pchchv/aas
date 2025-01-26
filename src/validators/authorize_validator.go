@@ -1,6 +1,17 @@
 package validators
 
-import "github.com/pchchv/aas/src/database"
+import (
+	"errors"
+	"fmt"
+	"net/http"
+	"regexp"
+	"strings"
+
+	"github.com/pchchv/aas/src/constants"
+	"github.com/pchchv/aas/src/customerrors"
+	"github.com/pchchv/aas/src/database"
+	"github.com/pchchv/aas/src/oidc"
+)
 
 type ValidateClientAndRedirectURIInput struct {
 	RequestId   string
@@ -23,4 +34,63 @@ func NewAuthorizeValidator(database database.Database) *AuthorizeValidator {
 	return &AuthorizeValidator{
 		database: database,
 	}
+}
+
+func (val *AuthorizeValidator) ValidateScopes(scope string) (err error) {
+	scope = strings.TrimSpace(scope)
+	if len(scope) == 0 {
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
+			"The 'scope' parameter is missing. Ensure to include one or more scopes, separated by spaces. Scopes can be an OpenID Connect scope, a resource:permission scope, or a combination of both.",
+			http.StatusBadRequest)
+	}
+
+	space := regexp.MustCompile(`\s+`)
+	scope = space.ReplaceAllString(scope, " ")
+	scopes := strings.Split(scope, " ")
+	for _, scopeStr := range scopes {
+		// these scopes don't need further validation
+		if oidc.IsIdTokenScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
+			continue
+		}
+
+		userInfoScope := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+		if scopeStr == userInfoScope {
+			err = errors.New("The '" + userInfoScope + "' scope is automatically included in the access token when an OpenID Connect scope is present. There's no need to request it explicitly. Please remove it from your request.")
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope", err.Error(), http.StatusBadRequest)
+		}
+
+		parts := strings.Split(scopeStr, ":")
+		if len(parts) != 2 {
+			err = errors.New("Invalid scope format: '" + scopeStr + "'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.")
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope", err.Error(), http.StatusBadRequest)
+		}
+
+		res, err := val.database.GetResourceByResourceIdentifier(nil, parts[0])
+		if err != nil {
+			return err
+		} else if res == nil {
+			err = errors.New("Invalid scope: '" + scopeStr + "'. Could not find a resource with identifier '" + parts[0] + "'.")
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope", err.Error(), http.StatusBadRequest)
+		}
+
+		permissions, err := val.database.GetPermissionsByResourceId(nil, res.Id)
+		if err != nil {
+			return err
+		}
+
+		permissionExists := false
+		for _, perm := range permissions {
+			if perm.PermissionIdentifier == parts[1] {
+				permissionExists = true
+				break
+			}
+		}
+
+		if !permissionExists {
+			err = errors.New("Scope '" + scopeStr + "' is invalid. The resource identified by '" + parts[0] + "' does not have a permission with identifier '" + parts[1] + "'.")
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope", err.Error(), http.StatusBadRequest)
+		}
+	}
+
+	return nil
 }
