@@ -239,3 +239,147 @@ func TestValidateRequest_EmptyResponseMode(t *testing.T) {
 	err := validator.ValidateRequest(&input)
 	assert.NoError(t, err)
 }
+
+func TestValidateClientAndRedirectURI_ExtremelyLongClientId(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+	longClientId := strings.Repeat("a", 1000)
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, longClientId).Return(nil, nil)
+	input := ValidateClientAndRedirectURIInput{ClientId: longClientId, RedirectURI: "http://example.com"}
+	err := validator.ValidateClientAndRedirectURI(&input)
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", customErr.GetDescription())
+}
+
+func TestValidateClientAndRedirectURI_ExtremelyLongRedirectURI(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+	client := &models.Client{
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid-client").Return(client, nil)
+	mockDB.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
+		client := args.Get(1).(*models.Client)
+		client.RedirectURIs = []models.RedirectURI{{URI: "http://example.com"}}
+	}).Return(nil)
+
+	longRedirectURI := "http://example.com/" + strings.Repeat("a", 2000)
+	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: longRedirectURI}
+	err := validator.ValidateClientAndRedirectURI(&input)
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "Invalid redirect_uri parameter. The client does not have this redirect URI registered.", customErr.GetDescription())
+}
+
+func TestValidateClientAndRedirectURI_MissingClientId(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	input := ValidateClientAndRedirectURIInput{ClientId: "", RedirectURI: "http://example.com"}
+	err := validator.ValidateClientAndRedirectURI(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "The client_id para meter is missing.", customErr.GetDescription())
+}
+
+func TestValidateClientAndRedirectURI_NonExistentClient(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "non-existent").Return(nil, nil)
+
+	input := ValidateClientAndRedirectURIInput{ClientId: "non-existent", RedirectURI: "http://example.com"}
+	err := validator.ValidateClientAndRedirectURI(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "Invalid client_id parameter. The client does not exist.", customErr.GetDescription())
+}
+
+func TestValidateClientAndRedirectURI_DisabledClient(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "disabled-client").Return(&models.Client{Enabled: false}, nil)
+
+	input := ValidateClientAndRedirectURIInput{ClientId: "disabled-client", RedirectURI: "http://example.com"}
+	err := validator.ValidateClientAndRedirectURI(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "Invalid client_id parameter. The client is disabled.", customErr.GetDescription())
+}
+
+func TestValidateClientAndRedirectURI_ClientWithoutAuthorizationCodeFlow(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "no-auth-code-client").Return(&models.Client{Enabled: true, AuthorizationCodeEnabled: false}, nil)
+
+	input := ValidateClientAndRedirectURIInput{ClientId: "no-auth-code-client", RedirectURI: "http://example.com"}
+	err := validator.ValidateClientAndRedirectURI(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "Invalid client_id parameter. The client does not support the authorization code flow.", customErr.GetDescription())
+}
+
+func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid-client").Return(&models.Client{Enabled: true, AuthorizationCodeEnabled: true}, nil)
+
+	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: ""}
+	err := validator.ValidateClientAndRedirectURI(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "The redirect_uri parameter is missing.", customErr.GetDescription())
+}
+
+func TestValidateClientAndRedirectURI_ValidClientAndRedirectURI(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	client := &models.Client{
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+	}
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid-client").Return(client, nil)
+	mockDB.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
+		client := args.Get(1).(*models.Client)
+		client.RedirectURIs = []models.RedirectURI{{URI: "http://example.com"}}
+	}).Return(nil)
+
+	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: "http://example.com"}
+	err := validator.ValidateClientAndRedirectURI(&input)
+
+	assert.NoError(t, err)
+}
+
+func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	validator := NewAuthorizeValidator(mockDB)
+
+	client := &models.Client{
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+	}
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid-client").Return(client, nil)
+	mockDB.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
+		client := args.Get(1).(*models.Client)
+		client.RedirectURIs = []models.RedirectURI{{URI: "http://example.com"}}
+	}).Return(nil)
+
+	input := ValidateClientAndRedirectURIInput{ClientId: "valid-client", RedirectURI: "http://invalid.com"}
+	err := validator.ValidateClientAndRedirectURI(&input)
+
+	assert.Error(t, err)
+	customErr := err.(*customerrors.ErrorDetail)
+	assert.Equal(t, "Invalid redirect_uri parameter. The client does not have this redirect URI registered.", customErr.GetDescription())
+}
