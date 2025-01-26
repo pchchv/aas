@@ -117,3 +117,43 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 
 	return nil
 }
+
+func (val *AuthorizeValidator) ValidateClientAndRedirectURI(input *ValidateClientAndRedirectURIInput) (err error) {
+	if len(input.ClientId) == 0 {
+		return customerrors.NewErrorDetail("", "The client_id parameter is missing.")
+	}
+
+	client, err := val.database.GetClientByClientIdentifier(nil, input.ClientId)
+	if err == nil {
+		if client == nil {
+			err = customerrors.NewErrorDetail("", "Invalid client_id parameter. The client does not exist.")
+		} else if !client.Enabled {
+			err = customerrors.NewErrorDetail("", "Invalid client_id parameter. The client is disabled.")
+		} else if !client.AuthorizationCodeEnabled {
+			err = customerrors.NewErrorDetail("", "Invalid client_id parameter. The client does not support the authorization code flow.")
+		} else if len(input.RedirectURI) == 0 {
+			err = customerrors.NewErrorDetail("", "The redirect_uri parameter is missing.")
+		}
+	}
+
+	if err != nil {
+		return
+	}
+
+	if err = val.database.ClientLoadRedirectURIs(nil, client); err != nil {
+		return
+	}
+
+	clientHasRedirectURI := false
+	for _, r := range client.RedirectURIs {
+		if input.RedirectURI == r.URI {
+			clientHasRedirectURI = true
+		}
+	}
+
+	if !clientHasRedirectURI {
+		return customerrors.NewErrorDetail("", "Invalid redirect_uri parameter. The client does not have this redirect URI registered.")
+	}
+
+	return nil
+}
