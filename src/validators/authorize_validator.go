@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/pchchv/aas/src/constants"
@@ -89,6 +90,28 @@ func (val *AuthorizeValidator) ValidateScopes(scope string) (err error) {
 		if !permissionExists {
 			err = errors.New("Scope '" + scopeStr + "' is invalid. The resource identified by '" + parts[0] + "' does not have a permission with identifier '" + parts[1] + "'.")
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope", err.Error(), http.StatusBadRequest)
+		}
+	}
+
+	return nil
+}
+
+func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) error {
+	if input.ResponseType != "code" {
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request", "Ensure response_type is set to 'code' as it's the only supported value.", http.StatusBadRequest)
+	}
+
+	if input.CodeChallengeMethod != "S256" {
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request", "PKCE is required. Ensure code_challenge_method is set to 'S256'.", http.StatusBadRequest)
+	}
+
+	if len(input.CodeChallenge) < 43 || len(input.CodeChallenge) > 128 {
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request", "The code_challenge parameter is either missing or incorrect. It should be 43 to 128 characters long.", http.StatusBadRequest)
+	}
+
+	if len(input.ResponseMode) > 0 {
+		if !slices.Contains([]string{"query", "fragment", "form_post"}, input.ResponseMode) {
+			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request", "Invalid response_mode parameter. Supported values are: query, fragment, form_post.", http.StatusBadRequest)
 		}
 	}
 
