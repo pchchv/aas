@@ -5,3 +5,10 @@ type ValidateClientAndRedirectURIInput struct {
 	ClientId    string
 	RedirectURI string
 }
+
+type ValidateRequestInput struct {
+	ResponseType        string
+	ResponseMode        string
+	CodeChallenge       string
+	CodeChallengeMethod string
+}
