@@ -47,3 +47,30 @@ func (val *EmailValidator) ValidateEmail(emailAddress string) error {
 
 	return nil
 }
+
+func (val *EmailValidator) ValidateEmailUpdate(input *ValidateEmailInput) error {
+	if len(input.Email) == 0 {
+		return customerrors.NewErrorDetail("", "Please enter an email address.")
+	}
+
+	if err := val.ValidateEmail(input.Email); err != nil {
+		return err
+	} else if len(input.Email) > 60 {
+		return customerrors.NewErrorDetail("", "The email address cannot exceed a maximum length of 60 characters.")
+	} else if input.Email != input.EmailConfirmation {
+		return customerrors.NewErrorDetail("", "The email and email confirmation entries must be identical.")
+	}
+
+	user, err := val.database.GetUserBySubject(nil, input.Subject)
+	if err != nil {
+		return err
+	}
+
+	if userByEmail, err := val.database.GetUserByEmail(nil, input.Email); err != nil {
+		return err
+	} else if userByEmail != nil && userByEmail.Subject != user.Subject {
+		return customerrors.NewErrorDetail("", "Apologies, but this email address is already registered.")
+	}
+
+	return nil
+}
