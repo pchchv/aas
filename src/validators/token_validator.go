@@ -17,3 +17,14 @@ type TokenParser interface {
 type AuditLogger interface {
 	Log(auditEvent string, details map[string]interface{})
 }
+
+type ValidateTokenRequestInput struct {
+	GrantType    string
+	Code         string
+	RedirectURI  string
+	CodeVerifier string
+	ClientId     string
+	ClientSecret string
+	Scope        string
+	RefreshToken string
+}
