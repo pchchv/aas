@@ -3,6 +3,7 @@ package validators
 import (
 	"crypto/rsa"
 
+	"github.com/pchchv/aas/src/database"
 	"github.com/pchchv/aas/src/models"
 	"github.com/pchchv/aas/src/oauth"
 )
@@ -36,4 +37,21 @@ type ValidateTokenRequestResult struct {
 	CodeEntity       *models.Code
 	RefreshToken     *models.RefreshToken
 	RefreshTokenInfo *oauth.Jwt
+}
+
+type TokenValidator struct {
+	database          database.Database
+	tokenParser       TokenParser
+	permissionChecker PermissionChecker
+	auditLogger       AuditLogger
+}
+
+func NewTokenValidator(database database.Database, tokenParser TokenParser,
+	permissionChecker PermissionChecker, auditLogger AuditLogger) *TokenValidator {
+	return &TokenValidator{
+		database:          database,
+		tokenParser:       tokenParser,
+		permissionChecker: permissionChecker,
+		auditLogger:       auditLogger,
+	}
 }
