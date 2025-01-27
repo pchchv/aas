@@ -3,6 +3,7 @@ package validators
 import (
 	"crypto/rsa"
 
+	"github.com/pchchv/aas/src/models"
 	"github.com/pchchv/aas/src/oauth"
 )
 
@@ -27,4 +28,12 @@ type ValidateTokenRequestInput struct {
 	ClientSecret string
 	Scope        string
 	RefreshToken string
+}
+
+type ValidateTokenRequestResult struct {
+	Scope            string
+	Client           *models.Client
+	CodeEntity       *models.Code
+	RefreshToken     *models.RefreshToken
+	RefreshTokenInfo *oauth.Jwt
 }
