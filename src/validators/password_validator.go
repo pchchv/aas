@@ -26,3 +26,21 @@ func (val *PasswordValidator) containsSpecialChar(s string) bool {
 	}
 	return false
 }
+
+func (val *PasswordValidator) containsLowerCase(s string) bool {
+	for _, char := range s {
+		if unicode.IsLower(char) {
+			return true
+		}
+	}
+	return false
+}
+
+func (val *PasswordValidator) containsUpperCase(s string) bool {
+	for _, char := range s {
+		if unicode.IsUpper(char) {
+			return true
+		}
+	}
+	return false
+}
