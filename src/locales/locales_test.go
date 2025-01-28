@@ -24,3 +24,38 @@ func TestNonEmptyFields(t *testing.T) {
 		}
 	}
 }
+
+func TestGet(t *testing.T) {
+	result := Get()
+	// Test that Get() returns a non-nil slice
+	if result == nil {
+		t.Error("Get() returned nil")
+	}
+
+	// Test that Get() returns a non-empty slice
+	if len(result) == 0 {
+		t.Error("Get() returned an empty slice")
+	}
+
+	// Test for a few known locales
+	knownLocales := map[string]string{
+		"en":    "English",
+		"es":    "Spanish",
+		"fr":    "French",
+		"zh-CN": "Chinese (China)",
+	}
+
+	for id, value := range knownLocales {
+		found := false
+		for _, locale := range result {
+			if locale.Id == id && locale.Value == value {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			t.Errorf("Expected locale {%s, %s} not found", id, value)
+		}
+	}
+}
