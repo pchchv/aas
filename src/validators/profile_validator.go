@@ -1,6 +1,11 @@
 package validators
 
-import "github.com/pchchv/aas/src/database"
+import (
+	"regexp"
+
+	"github.com/pchchv/aas/src/customerrors"
+	"github.com/pchchv/aas/src/database"
+)
 
 type ValidateProfileInput struct {
 	Username            string
@@ -25,4 +30,21 @@ func NewProfileValidator(database database.Database) *ProfileValidator {
 	return &ProfileValidator{
 		database: database,
 	}
+}
+
+func (val *ProfileValidator) ValidateName(name string, nameField string) error {
+	pattern := `^[\p{L}\s'-]{2,48}$`
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		return err
+	}
+
+	if len(name) > 0 && !regex.MatchString(name) {
+		return customerrors.NewErrorDetail(
+			"",
+			"Please enter a valid "+nameField+". It should contain only letters, spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.",
+		)
+	}
+
+	return nil
 }
