@@ -96,3 +96,24 @@ func TestValidatePhone(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSimplePattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"Repeating digit", "111111", true},
+		{"Ascending sequence", "123456", true},
+		{"Descending sequence", "987654", true},
+		{"Non-simple pattern", "123454", false},
+		{"Mixed pattern", "112233", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isSimplePattern(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
