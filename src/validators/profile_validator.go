@@ -1,5 +1,7 @@
 package validators
 
+import "github.com/pchchv/aas/src/database"
+
 type ValidateProfileInput struct {
 	Username            string
 	GivenName           string
@@ -13,4 +15,14 @@ type ValidateProfileInput struct {
 	Subject             string
 	ZoneInfo            string
 	ZoneInfoCountryName string
+}
+
+type ProfileValidator struct {
+	database database.Database
+}
+
+func NewProfileValidator(database database.Database) *ProfileValidator {
+	return &ProfileValidator{
+		database: database,
+	}
 }
