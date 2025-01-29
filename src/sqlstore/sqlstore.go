@@ -1,7 +1,9 @@
 package sessionstore
 
 import (
+	"encoding/gob"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
@@ -33,4 +35,8 @@ func NewSQLStore(db database.Database, path string, maxAge int, httpOnly bool, s
 			SameSite: sameSite,
 		},
 	}
+}
+
+func init() {
+	gob.Register(time.Time{})
 }
