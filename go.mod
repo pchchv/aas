@@ -70,6 +70,7 @@ require (
 	github.com/spf13/viper v1.15.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
+	github.com/sym01/htmlsanitizer v1.1.0
 	github.com/vektra/mockery v1.1.2 // indirect
 	github.com/vektra/mockery/v2 v2.51.1 // indirect
 	github.com/xhit/go-simple-mail/v2 v2.16.0
