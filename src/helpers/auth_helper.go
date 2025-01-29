@@ -97,3 +97,29 @@ func (s *AuthHelper) RedirToAuthorize(w http.ResponseWriter, r *http.Request, cl
 
 	return nil
 }
+
+func (s *AuthHelper) ClearAuthContext(w http.ResponseWriter, r *http.Request) error {
+	sess, err := s.sessionStore.Get(r, constants.SessionName)
+	if err != nil {
+		return err
+	}
+
+	delete(sess.Values, constants.SessionKeyAuthContext)
+
+	return s.sessionStore.Save(r, w, sess)
+}
+
+func (s *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *oauth.AuthContext) error {
+	sess, err := s.sessionStore.Get(r, constants.SessionName)
+	if err != nil {
+		return err
+	}
+
+	if jsonData, err := json.Marshal(authContext); err != nil {
+		return err
+	} else {
+		sess.Values[constants.SessionKeyAuthContext] = string(jsonData)
+	}
+
+	return s.sessionStore.Save(r, w, sess)
+}
