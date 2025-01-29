@@ -73,6 +73,40 @@ func (store *SQLStore) Get(r *http.Request, name string) (*sessions.Session, err
 	return sessions.GetRegistry(r).Get(store, name)
 }
 
+func (store *SQLStore) Save(r *http.Request, w http.ResponseWriter, session *sessions.Session) (err error) {
+	if session.ID == "" {
+		if err = store.insert(session); err != nil {
+			return
+		}
+	} else if err = store.save(session); err != nil {
+		return
+	}
+
+	if encoded, err := securecookie.EncodeMulti(session.Name(), session.ID, store.Codecs...); err != nil {
+		return err
+	} else {
+		http.SetCookie(w, sessions.NewCookie(session.Name(), encoded, session.Options))
+	}
+
+	return nil
+}
+
+func (store *SQLStore) Delete(w http.ResponseWriter, session *sessions.Session) error {
+	options := *session.Options
+	options.MaxAge = -1
+	http.SetCookie(w, sessions.NewCookie(session.Name(), "", &options))
+	for k := range session.Values {
+		delete(session.Values, k)
+	}
+
+	sessIDint, err := parseSessionID(session.ID)
+	if err != nil {
+		return err
+	}
+
+	return store.db.DeleteHttpSession(nil, sessIDint)
+}
+
 func (store *SQLStore) load(session *sessions.Session) (err error) {
 	sessIDint, err := parseSessionID(session.ID)
 	if err != nil {
