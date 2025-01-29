@@ -123,3 +123,18 @@ func (s *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, aut
 
 	return s.sessionStore.Save(r, w, sess)
 }
+
+func (s *AuthHelper) IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesAnyOf []string) bool {
+	if jwtInfo.AccessToken != nil {
+		for _, scope := range scopesAnyOf {
+			if jwtInfo.AccessToken.HasScope(scope) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (s *AuthHelper) IsAuthenticated(jwtInfo oauth.JwtInfo) bool {
+	return jwtInfo.IdToken != nil
+}
