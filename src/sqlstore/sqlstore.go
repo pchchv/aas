@@ -1,6 +1,7 @@
 package sessionstore
 
 import (
+	"database/sql"
 	"encoding/gob"
 	"fmt"
 	"net/http"
@@ -9,6 +10,8 @@ import (
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 	"github.com/pchchv/aas/src/database"
+	"github.com/pchchv/aas/src/models"
+	"github.com/pkg/errors"
 )
 
 type SQLStore struct {
@@ -40,6 +43,75 @@ func NewSQLStore(db database.Database, path string, maxAge int, httpOnly bool, s
 
 func init() {
 	gob.Register(time.Time{})
+}
+
+func (store *SQLStore) load(session *sessions.Session) (err error) {
+	sessIDint, err := parseSessionID(session.ID)
+	if err != nil {
+		return
+	}
+
+	var sess *models.HttpSession
+	if sess, err = store.db.GetHttpSessionById(nil, sessIDint); err != nil {
+		return
+	} else if sess == nil {
+		return errors.WithStack(errors.New("session not found"))
+	}
+
+	if time.Until(sess.ExpiresOn.Time) < 0 {
+		return errors.WithStack(errors.New("session expired"))
+	}
+
+	if err = securecookie.DecodeMulti(session.Name(), sess.Data, &session.Values, store.Codecs...); err != nil {
+		return
+	}
+
+	session.Values["created_on"] = sess.CreatedAt.Time
+	session.Values["modified_on"] = sess.UpdatedAt.Time
+	session.Values["expires_on"] = sess.ExpiresOn.Time
+	return nil
+}
+
+func (store *SQLStore) insert(session *sessions.Session) (err error) {
+	var createdOn time.Time
+	var modifiedOn time.Time
+	var expiresOn time.Time
+	now := time.Now().UTC()
+	if crOn := session.Values["created_on"]; crOn == nil {
+		createdOn = now
+	} else {
+		createdOn = crOn.(time.Time)
+	}
+
+	modifiedOn = createdOn
+	if exOn := session.Values["expires_on"]; exOn == nil {
+		expiresOn = now.Add(time.Second * time.Duration(session.Options.MaxAge))
+	} else {
+		expiresOn = exOn.(time.Time)
+	}
+
+	delete(session.Values, "created_on")
+	delete(session.Values, "expires_on")
+	delete(session.Values, "modified_on")
+
+	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values, store.Codecs...)
+	if err != nil {
+		return
+	}
+
+	sess := models.HttpSession{
+		Data:      encoded,
+		CreatedAt: sql.NullTime{Time: createdOn, Valid: true},
+		UpdatedAt: sql.NullTime{Time: modifiedOn, Valid: true},
+		ExpiresOn: sql.NullTime{Time: expiresOn, Valid: true},
+	}
+
+	if err = store.db.CreateHttpSession(nil, &sess); err != nil {
+		return
+	}
+
+	session.ID = fmt.Sprintf("%d", sess.Id)
+	return nil
 }
 
 func parseSessionID(sessionID string) (sessIDint int64, err error) {
