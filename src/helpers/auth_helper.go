@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"runtime/debug"
 
 	"github.com/gorilla/sessions"
+	"github.com/pchchv/aas/src/config"
 	"github.com/pchchv/aas/src/constants"
 	"github.com/pchchv/aas/src/customerrors"
+	"github.com/pchchv/aas/src/hashutil"
 	"github.com/pchchv/aas/src/oauth"
+	"github.com/pchchv/aas/src/stringutil"
 )
 
 type AuthHelper struct {
@@ -50,4 +54,46 @@ func (s *AuthHelper) GetLoggedInSubject(r *http.Request) string {
 	}
 
 	return ""
+}
+
+func (s *AuthHelper) RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string) error {
+	sess, err := s.sessionStore.Get(r, constants.SessionName)
+	if err != nil {
+		return err
+	}
+
+	redirectURI := config.Get().BaseURL + "/auth/callback"
+	codeVerifier := stringutil.GenerateSecurityRandomString(120)
+	codeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
+	state := stringutil.GenerateSecurityRandomString(16)
+	nonce := stringutil.GenerateSecurityRandomString(16)
+	sess.Values[constants.SessionKeyState] = state
+	sess.Values[constants.SessionKeyNonce] = nonce
+	sess.Values[constants.SessionKeyCodeVerifier] = codeVerifier
+	sess.Values[constants.SessionKeyRedirectURI] = redirectURI
+	sess.Values[constants.SessionKeyRedirectBack] = redirectBack
+	if err = s.sessionStore.Save(r, w, sess); err != nil {
+		return err
+	}
+
+	values := url.Values{}
+	values.Add("client_id", clientIdentifier)
+	values.Add("redirect_uri", redirectURI)
+	values.Add("response_mode", "form_post")
+	values.Add("response_type", "code")
+	values.Add("code_challenge_method", "S256")
+	values.Add("code_challenge", codeChallenge)
+	values.Add("state", state)
+	if nonceHash, err := hashutil.HashString(nonce); err != nil {
+		return err
+	} else {
+		values.Add("nonce", nonceHash)
+		values.Add("scope", scope)
+		values.Add("acr_values", "2") // pwd + optional otp (if enabled)
+	}
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize?" + values.Encode()
+	http.Redirect(w, r, destUrl, http.StatusFound)
+
+	return nil
 }
