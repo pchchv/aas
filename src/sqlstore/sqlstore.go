@@ -15,6 +15,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var defaultInterval = time.Minute * 5
+
 type SQLStore struct {
 	db      database.Database
 	Codecs  []securecookie.Codec
@@ -106,6 +108,23 @@ func (store *SQLStore) Delete(w http.ResponseWriter, session *sessions.Session) 
 	}
 
 	return store.db.DeleteHttpSession(nil, sessIDint)
+}
+
+// Cleanup runs a background goroutine every interval that deletes expired sessions from the database.
+func (store *SQLStore) Cleanup(interval time.Duration) (chan<- struct{}, <-chan struct{}) {
+	if interval <= 0 {
+		interval = defaultInterval
+	}
+
+	quit, done := make(chan struct{}), make(chan struct{})
+	go store.cleanup(interval, quit, done)
+	return quit, done
+}
+
+// StopCleanup stops the background cleanup from running.
+func (store *SQLStore) StopCleanup(quit chan<- struct{}, done <-chan struct{}) {
+	quit <- struct{}{}
+	<-done
 }
 
 func (store *SQLStore) load(session *sessions.Session) (err error) {
