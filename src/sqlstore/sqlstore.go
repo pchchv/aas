@@ -45,6 +45,34 @@ func init() {
 	gob.Register(time.Time{})
 }
 
+func (store *SQLStore) New(r *http.Request, name string) (session *sessions.Session, err error) {
+	session = sessions.NewSession(store, name)
+	session.Options = &sessions.Options{
+		Path:     store.Options.Path,
+		Domain:   store.Options.Domain,
+		MaxAge:   store.Options.MaxAge,
+		Secure:   store.Options.Secure,
+		HttpOnly: store.Options.HttpOnly,
+		SameSite: store.Options.SameSite,
+	}
+	session.IsNew = true
+	if cook, errCookie := r.Cookie(name); errCookie == nil {
+		if err = securecookie.DecodeMulti(name, cook.Value, &session.ID, store.Codecs...); err == nil {
+			if err = store.load(session); err == nil {
+				session.IsNew = false
+			} else {
+				err = nil
+			}
+		}
+	}
+
+	return
+}
+
+func (store *SQLStore) Get(r *http.Request, name string) (*sessions.Session, error) {
+	return sessions.GetRegistry(r).Get(store, name)
+}
+
 func (store *SQLStore) load(session *sessions.Session) (err error) {
 	sessIDint, err := parseSessionID(session.ID)
 	if err != nil {
