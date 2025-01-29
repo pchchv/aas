@@ -2,6 +2,7 @@ package sessionstore
 
 import (
 	"encoding/gob"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -39,4 +40,14 @@ func NewSQLStore(db database.Database, path string, maxAge int, httpOnly bool, s
 
 func init() {
 	gob.Register(time.Time{})
+}
+
+func parseSessionID(sessionID string) (sessIDint int64, err error) {
+	if n, err := fmt.Sscanf(sessionID, "%d", &sessIDint); err != nil {
+		return 0, errors.Wrapf(err, "unable to parse session ID: %s", sessionID)
+	} else if n != 1 {
+		return 0, errors.WithStack(fmt.Errorf("unable to parse session ID: %s", sessionID))
+	}
+
+	return sessIDint, nil
 }
