@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/gob"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -226,6 +227,28 @@ func (store *SQLStore) save(session *sessions.Session) error {
 // deleteExpired deletes expired sessions from the database.
 func (store *SQLStore) deleteExpired() error {
 	return store.db.DeleteHttpSessionExpired(nil)
+}
+
+// cleanup deletes expired sessions at set intervals.
+func (store *SQLStore) cleanup(interval time.Duration, quit <-chan struct{}, done chan<- struct{}) {
+	ticker := time.NewTicker(interval)
+	defer func() {
+		ticker.Stop()
+	}()
+
+	for {
+		select {
+		case <-quit:
+			// Handle the quit signal.
+			done <- struct{}{}
+			return
+		case <-ticker.C:
+			// Delete expired sessions on each tick.
+			if err := store.deleteExpired(); err != nil {
+				slog.Warn("SQLStore: unable to delete expired sessions", slog.String("error", err.Error()))
+			}
+		}
+	}
 }
 
 func parseSessionID(sessionID string) (sessIDint int64, err error) {
