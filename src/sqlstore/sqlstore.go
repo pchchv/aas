@@ -114,6 +114,58 @@ func (store *SQLStore) insert(session *sessions.Session) (err error) {
 	return nil
 }
 
+func (store *SQLStore) save(session *sessions.Session) error {
+	if session.IsNew {
+		return store.insert(session)
+	}
+
+	var createdOn time.Time
+	var expiresOn time.Time
+	now := time.Now().UTC()
+	if crOn := session.Values["created_on"]; crOn == nil {
+		createdOn = now
+	} else {
+		createdOn = crOn.(time.Time)
+	}
+
+	if exOn := session.Values["expires_on"]; exOn == nil {
+		expiresOn = now.Add(time.Second * time.Duration(session.Options.MaxAge))
+	} else {
+		expiresOn = exOn.(time.Time)
+		if expiresOn.Sub(now.Add(time.Second*time.Duration(session.Options.MaxAge))) < 0 {
+			expiresOn = now.Add(time.Second * time.Duration(session.Options.MaxAge))
+		}
+	}
+
+	delete(session.Values, "created_on")
+	delete(session.Values, "expires_on")
+	delete(session.Values, "modified_on")
+	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values, store.Codecs...)
+	if err != nil {
+		return err
+	}
+
+	sessIDint, err := parseSessionID(session.ID)
+	if err != nil {
+		return err
+	}
+
+	sess := models.HttpSession{
+		Id:        sessIDint,
+		Data:      encoded,
+		CreatedAt: sql.NullTime{Time: createdOn, Valid: true},
+		UpdatedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
+		ExpiresOn: sql.NullTime{Time: expiresOn, Valid: true},
+	}
+
+	return store.db.UpdateHttpSession(nil, &sess)
+}
+
+// deleteExpired deletes expired sessions from the database.
+func (store *SQLStore) deleteExpired() error {
+	return store.db.DeleteHttpSessionExpired(nil)
+}
+
 func parseSessionID(sessionID string) (sessIDint int64, err error) {
 	if n, err := fmt.Sscanf(sessionID, "%d", &sessIDint); err != nil {
 		return 0, errors.Wrapf(err, "unable to parse session ID: %s", sessionID)
