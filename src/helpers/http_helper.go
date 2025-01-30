@@ -27,6 +27,29 @@ func NewHttpHelper(templateFS fs.FS, database database.Database) *HttpHelper {
 	}
 }
 
+func (h *HttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string, data map[string]interface{}) error {
+	buf, err := h.RenderTemplateToBuffer(r, layoutName, templateName, data)
+	if err != nil {
+		return err
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+
+	if data != nil && data["_httpStatus"] != nil {
+		httpStatus, ok := data["_httpStatus"].(int)
+		if !ok {
+			return errors.WithStack(errors.New("unable to cast _httpStatus to int"))
+		}
+		w.WriteHeader(httpStatus)
+	}
+
+	if _, err = buf.WriteTo(w); err != nil {
+		return errors.WithStack(errors.New("unable to write to response writer"))
+	}
+
+	return nil
+}
+
 func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string, data map[string]interface{}) (*bytes.Buffer, error) {
 	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 	data["appName"] = settings.AppName
