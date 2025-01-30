@@ -77,3 +77,11 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 
 	return &buf, nil
 }
+
+func (h *HttpHelper) GetFromUrlQueryOrFormPost(r *http.Request, key string) string {
+	value := r.URL.Query().Get(key)
+	if len(value) == 0 {
+		value = r.FormValue(key)
+	}
+	return value
+}
