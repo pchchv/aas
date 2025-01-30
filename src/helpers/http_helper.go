@@ -2,12 +2,15 @@ package helpers
 
 import (
 	"bytes"
+	"fmt"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"text/template"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/pchchv/aas/src/constants"
 	"github.com/pchchv/aas/src/database"
 	"github.com/pchchv/aas/src/models"
@@ -107,4 +110,18 @@ func (h *HttpHelper) GetFromUrlQueryOrFormPost(r *http.Request, key string) stri
 		value = r.FormValue(key)
 	}
 	return value
+}
+
+func (h *HttpHelper) InternalServerError(w http.ResponseWriter, r *http.Request, err error) {
+	requestId := middleware.GetReqID(r.Context())
+	slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
+
+	w.WriteHeader(http.StatusInternalServerError)
+
+	err = h.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/error.html", map[string]interface{}{
+		"requestId": requestId,
+	})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unable to render the error page: %v", err.Error()), http.StatusInternalServerError)
+	}
 }
