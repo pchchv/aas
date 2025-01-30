@@ -5,13 +5,17 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/pchchv/aas/src/constants"
 	mocksData "github.com/pchchv/aas/src/database/mocks"
 	"github.com/pchchv/aas/src/mocks"
 	"github.com/pchchv/aas/src/models"
 	"github.com/pchchv/aas/src/oauth"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -137,4 +141,48 @@ func TestGetFromUrlQueryOrFormPost(t *testing.T) {
 		value := httpHelper.GetFromUrlQueryOrFormPost(req, "key")
 		assert.Equal(t, "value", value)
 	})
+}
+
+func TestInternalServerError(t *testing.T) {
+	templateFS := &mocks.TestFS{
+		FileContents: map[string]string{
+			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
+			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
+		},
+	}
+	database := mocksData.NewDatabase(t)
+	httpHelper := NewHttpHelper(templateFS, database)
+
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{})
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	})
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		httpHelper.InternalServerError(w, r, errors.New("test error"))
+	})
+
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), "Error:")
+
+	// Check if the response contains a request ID
+	assert.Regexp(t, `Error: [a-zA-Z0-9/-]+`, w.Body.String(), "Response should contain a request ID")
+
+	// Check if the content type is set correctly
+	assert.Equal(t, "text/html; charset=UTF-8", w.Header().Get("Content-Type"))
+
+	// Ensure the response body is not empty
+	assert.NotEmpty(t, w.Body.String())
+
+	// Check if the response contains expected HTML structure
+	assert.True(t, strings.HasPrefix(w.Body.String(), "<html>"))
+	assert.True(t, strings.HasSuffix(w.Body.String(), "</html>"))
 }
