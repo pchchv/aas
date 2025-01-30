@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"bytes"
 	"context"
 	"net/http/httptest"
 	"testing"
@@ -64,5 +65,25 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 		assert.Contains(t, buf.String(), "Hello, JohnDoe!")
 
 		mockDatabase.AssertExpectations(t)
+	})
+}
+
+func TestGetFromUrlQueryOrFormPost(t *testing.T) {
+	templateFS := &mocks.TestFS{}
+	database := mocksData.NewDatabase(t)
+	httpHelper := NewHttpHelper(templateFS, database)
+	t.Run("Get from URL query", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/?key=value", nil)
+		value := httpHelper.GetFromUrlQueryOrFormPost(req, "key")
+		assert.Equal(t, "value", value)
+	})
+
+	t.Run("Get from form post", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/", bytes.NewBufferString("key=value"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		err := req.ParseForm()
+		assert.NoError(t, err)
+		value := httpHelper.GetFromUrlQueryOrFormPost(req, "key")
+		assert.Equal(t, "value", value)
 	})
 }
