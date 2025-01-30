@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/pchchv/aas/src/constants"
+	"github.com/pchchv/aas/src/customerrors"
 	"github.com/pchchv/aas/src/database"
 	"github.com/pchchv/aas/src/models"
 	"github.com/pchchv/aas/src/oauth"
@@ -123,5 +125,44 @@ func (h *HttpHelper) InternalServerError(w http.ResponseWriter, r *http.Request,
 	})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to render the error page: %v", err.Error()), http.StatusInternalServerError)
+	}
+}
+
+func (h *HttpHelper) JsonError(w http.ResponseWriter, r *http.Request, err error) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var errorStr, errorDescriptionStr string
+	requestId := middleware.GetReqID(r.Context())
+	errorDetail, ok := err.(*customerrors.ErrorDetail)
+	if ok {
+		// error detail
+		statusCode := errorDetail.GetHttpStatusCode()
+		if statusCode == 0 {
+			statusCode = http.StatusInternalServerError
+		}
+		w.WriteHeader(statusCode)
+		errorStr = errorDetail.GetCode()
+		errorDescriptionStr = errorDetail.GetDescription()
+	} else {
+		// any other error
+		w.WriteHeader(http.StatusInternalServerError)
+		slog.Error(fmt.Sprintf("%+v\nrequest-id: %v", err, requestId))
+		errorStr = "server_error"
+		errorDescriptionStr = fmt.Sprintf("An unexpected server error has occurred. For additional information, refer to the server logs. Request Id: %v", requestId)
+	}
+
+	values := map[string]string{
+		"error":             errorStr,
+		"error_description": errorDescriptionStr,
+	}
+	if err = json.NewEncoder(w).Encode(values); err != nil {
+		h.InternalServerError(w, r, err)
+	}
+}
+
+func (h *HttpHelper) EncodeJson(w http.ResponseWriter, r *http.Request, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		h.JsonError(w, r, err)
 	}
 }
