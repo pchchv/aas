@@ -1,4 +1,4 @@
-package handlerhelpers
+package helpers
 
 import (
 	"context"
