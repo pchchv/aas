@@ -3,6 +3,7 @@ package helpers
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/pchchv/aas/src/constants"
+	"github.com/pchchv/aas/src/customerrors"
 	mocksData "github.com/pchchv/aas/src/database/mocks"
 	"github.com/pchchv/aas/src/mocks"
 	"github.com/pchchv/aas/src/models"
@@ -185,4 +187,43 @@ func TestInternalServerError(t *testing.T) {
 	// Check if the response contains expected HTML structure
 	assert.True(t, strings.HasPrefix(w.Body.String(), "<html>"))
 	assert.True(t, strings.HasSuffix(w.Body.String(), "</html>"))
+}
+
+func TestJsonError(t *testing.T) {
+	templateFS := &mocks.TestFS{}
+	database := mocksData.NewDatabase(t)
+	httpHelper := NewHttpHelper(templateFS, database)
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	err := customerrors.NewErrorDetail("test_error", "Test error description")
+	httpHelper.JsonError(w, req, err)
+
+	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+	var response map[string]string
+	err2 := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err2)
+
+	assert.Equal(t, "test_error", response["error"])
+	assert.Equal(t, "Test error description", response["error_description"])
+}
+
+func TestEncodeJson(t *testing.T) {
+	templateFS := &mocks.TestFS{}
+	database := mocksData.NewDatabase(t)
+	httpHelper := NewHttpHelper(templateFS, database)
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	data := map[string]string{"key": "value"}
+	httpHelper.EncodeJson(w, req, data)
+
+	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]string
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "value", response["key"])
 }
