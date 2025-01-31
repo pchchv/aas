@@ -3,7 +3,10 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/pchchv/aas/src/models"
 )
 
 const skipCheckKey string = "gorilla.csrf.Skip"
@@ -41,4 +44,24 @@ func TestMiddlewareSkipCsrf(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 		})
 	}
+}
+
+func TestMiddlewareCsrf(t *testing.T) {
+	settings := &models.Settings{
+		SessionAuthenticationKey: []byte("test-key"),
+	}
+	handler := MiddlewareCsrf(settings)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	t.Run("CSRF middleware applied", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/", nil)
+		rr := httptest.NewRecorder()
+
+		handler.ServeHTTP(rr, req)
+
+		if rr.Header().Get("Set-Cookie") == "" || !strings.Contains(rr.Header().Get("Set-Cookie"), "_gorilla_csrf=") {
+			t.Error("Expected CSRF cookie to be set")
+		}
+	})
 }
