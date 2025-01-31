@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/gorilla/csrf"
+	"github.com/pchchv/aas/src/config"
+	"github.com/pchchv/aas/src/models"
 )
 
 func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
@@ -26,4 +28,8 @@ func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 		}
 		return http.HandlerFunc(fn)
 	}
+}
+
+func MiddlewareCsrf(settings *models.Settings) func(next http.Handler) http.Handler {
+	return csrf.Protect(settings.SessionAuthenticationKey, csrf.Secure(config.Get().SetCookieSecure))
 }
