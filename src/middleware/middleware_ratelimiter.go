@@ -62,3 +62,27 @@ func (m *RateLimiterMiddleware) LimitOtp(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+func (m *RateLimiterMiddleware) LimitActivate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		email := r.URL.Query().Get("email")
+		if m.activateLimiter.RespondOnLimit(w, r, email) {
+			slog.Error("Rate limiter - limit reached (activate)", "email", email)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (m *RateLimiterMiddleware) LimitResetPwd(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		email := r.URL.Query().Get("email")
+		if m.resetPwdLimiter.RespondOnLimit(w, r, email) {
+			slog.Error("Rate limiter - limit reached (resetPwd)", "email", email)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
