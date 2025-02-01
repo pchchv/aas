@@ -73,6 +73,73 @@ func (m *MiddlewareJwt) JwtAuthorizationHeaderToContext() func(http.Handler) htt
 	}
 }
 
+// JwtSessionHandler is a middleware that checks if the user has a valid JWT session.
+// It will also refresh the token if needed.
+func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			sess, err := m.sessionStore.Get(r, constants.SessionName)
+			if err != nil {
+				err = errors.New("unable to get the session: " + err.Error())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if sess.Values[constants.SessionKeyJwt] != nil {
+				tokenResponse, ok := sess.Values[constants.SessionKeyJwt].(oauth.TokenResponse)
+				if !ok {
+					http.Error(w, "unable to cast the session value to TokenResponse", http.StatusInternalServerError)
+					return
+				}
+
+				// Check if token needs refresh
+				if _, err := m.tokenParser.DecodeAndValidateTokenString(tokenResponse.AccessToken, nil, true); err != nil {
+					if refreshed, err := m.refreshToken(w, r, &tokenResponse); err != nil || !refreshed {
+						// If refresh failed, clear the session and continue
+						delete(sess.Values, constants.SessionKeyJwt)
+						if err := m.sessionStore.Save(r, w, sess); err != nil {
+							err = errors.New("unable to save the session: " + err.Error())
+							http.Error(w, err.Error(), http.StatusInternalServerError)
+							return
+						}
+						next.ServeHTTP(w, r)
+						return
+					}
+				}
+
+				// Get the latest token response from the session
+				tokenResponse = sess.Values[constants.SessionKeyJwt].(oauth.TokenResponse)
+				if jwtInfo, err := m.tokenParser.DecodeAndValidateTokenResponse(&tokenResponse); err == nil {
+					settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+					// Check if any token has an invalid issuer
+					hasInvalidIssuer := (jwtInfo.IdToken != nil && !jwtInfo.IdToken.IsIssuerValid(settings.Issuer)) ||
+						(jwtInfo.AccessToken != nil && !jwtInfo.AccessToken.IsIssuerValid(settings.Issuer)) ||
+						(jwtInfo.RefreshToken != nil && !jwtInfo.RefreshToken.IsIssuerValid(settings.Issuer))
+					if hasInvalidIssuer {
+						slog.Error("Invalid issuer in JWT token. Will clear the session and redirect to root")
+						// Clear the session
+						delete(sess.Values, constants.SessionKeyJwt)
+						if err := m.sessionStore.Save(r, w, sess); err != nil {
+							err = errors.New("unable to save the session: " + err.Error())
+							http.Error(w, err.Error(), http.StatusInternalServerError)
+							return
+						}
+
+						// Redirect to root
+						http.Redirect(w, r, "/", http.StatusFound)
+						return
+					}
+
+					ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, *jwtInfo)
+				}
+			}
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 func (m *MiddlewareJwt) refreshToken(w http.ResponseWriter, r *http.Request, tokenResponse *oauth.TokenResponse) (bool, error) {
 	if tokenResponse.RefreshToken == "" {
 		return false, nil
