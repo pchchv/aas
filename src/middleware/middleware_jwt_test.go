@@ -23,6 +23,10 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// import (
+// 	storeMocks "github.com/leodip/goiabada/core/sessionstore/mocks"
+// )
+
 type mockHTTPClient struct {
 	mock.Mock
 }
@@ -688,4 +692,143 @@ func TestBuildScopeString_SpecialCharacters(t *testing.T) {
 	for _, scope := range expectedScopes {
 		assert.Contains(t, resultParts, scope, "Result should contain scope: "+scope)
 	}
+}
+
+func TestRequiresScope_Authorized(t *testing.T) {
+	mockTokenParser := new(OAuthMocks.TokenParser)
+	mockDatabase := new(dataMocks.Database)
+	mockAuthHelper := new(helpersMocks.AuthHelper)
+	mockSessionStore := new(storeMocks.Store)
+	middleware := NewMiddlewareJwt(mockSessionStore, mockTokenParser, mockDatabase, mockAuthHelper, nil)
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+	jwtInfo := oauth.JwtInfo{
+		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
+	}
+	ctx := req.Context()
+	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+	req = req.WithContext(ctx)
+
+	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(true)
+
+	nextCalled := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+	})
+
+	handler := middleware.RequiresScope([]string{"required:scope"})(next)
+	handler.ServeHTTP(rr, req)
+
+	assert.True(t, nextCalled, "Next handler should have been called")
+	assert.Equal(t, http.StatusOK, rr.Code)
+	mockAuthHelper.AssertExpectations(t)
+}
+
+func TestRequiresScope_Unauthorized(t *testing.T) {
+	mockTokenParser := new(OAuthMocks.TokenParser)
+	mockDatabase := new(dataMocks.Database)
+	mockAuthHelper := new(helpersMocks.AuthHelper)
+	mockSessionStore := new(storeMocks.Store)
+	middleware := NewMiddlewareJwt(mockSessionStore, mockTokenParser, mockDatabase, mockAuthHelper, nil)
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+
+	jwtInfo := oauth.JwtInfo{
+		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
+	}
+	ctx := req.Context()
+	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+	req = req.WithContext(ctx)
+
+	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
+	mockAuthHelper.On("IsAuthenticated", jwtInfo).Return(true)
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("Next handler should not have been called")
+	})
+
+	handler := middleware.RequiresScope([]string{"required:scope"})(next)
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusFound, rr.Code)
+	assert.Equal(t, "/unauthorized", rr.Header().Get("Location"))
+	mockAuthHelper.AssertExpectations(t)
+}
+
+func TestRequiresScope_Unauthenticated(t *testing.T) {
+	mockTokenParser := new(OAuthMocks.TokenParser)
+	mockDatabase := new(dataMocks.Database)
+	mockAuthHelper := new(helpersMocks.AuthHelper)
+	mockSessionStore := new(storeMocks.Store)
+	middleware := NewMiddlewareJwt(mockSessionStore, mockTokenParser, mockDatabase, mockAuthHelper, nil)
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+	jwtInfo := oauth.JwtInfo{}
+	ctx := req.Context()
+	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+	req = req.WithContext(ctx)
+
+	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
+	mockAuthHelper.On("IsAuthenticated", jwtInfo).Return(false)
+	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, constants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("Next handler should not have been called")
+	})
+
+	handler := middleware.RequiresScope([]string{"required:scope"})(next)
+	handler.ServeHTTP(rr, req)
+
+	mockAuthHelper.AssertExpectations(t)
+}
+
+func TestRequiresScope_NoJwtInfo(t *testing.T) {
+	mockTokenParser := new(OAuthMocks.TokenParser)
+	mockDatabase := new(dataMocks.Database)
+	mockAuthHelper := new(helpersMocks.AuthHelper)
+	mockSessionStore := new(storeMocks.Store)
+	middleware := NewMiddlewareJwt(mockSessionStore, mockTokenParser, mockDatabase, mockAuthHelper, nil)
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+
+	mockAuthHelper.On("IsAuthorizedToAccessResource", oauth.JwtInfo{}, []string{"required:scope"}).Return(false)
+	mockAuthHelper.On("IsAuthenticated", oauth.JwtInfo{}).Return(false)
+	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, constants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("Next handler should not have been called")
+	})
+
+	handler := middleware.RequiresScope([]string{"required:scope"})(next)
+	handler.ServeHTTP(rr, req)
+
+	mockAuthHelper.AssertExpectations(t)
+}
+
+func TestRequiresScope_RedirectError(t *testing.T) {
+	mockTokenParser := new(OAuthMocks.TokenParser)
+	mockDatabase := new(dataMocks.Database)
+	mockAuthHelper := new(helpersMocks.AuthHelper)
+	mockSessionStore := new(storeMocks.Store)
+	middleware := NewMiddlewareJwt(mockSessionStore, mockTokenParser, mockDatabase, mockAuthHelper, nil)
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+	jwtInfo := oauth.JwtInfo{}
+	ctx := req.Context()
+	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+	req = req.WithContext(ctx)
+
+	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
+	mockAuthHelper.On("IsAuthenticated", jwtInfo).Return(false)
+	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, constants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(assert.AnError)
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("Next handler should not have been called")
+	})
+
+	handler := middleware.RequiresScope([]string{"required:scope"})(next)
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	mockAuthHelper.AssertExpectations(t)
 }
