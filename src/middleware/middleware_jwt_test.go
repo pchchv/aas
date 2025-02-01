@@ -14,6 +14,15 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+type mockHTTPClient struct {
+	mock.Mock
+}
+
+func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	args := m.Called(req)
+	return args.Get(0).(*http.Response), args.Error(1)
+}
+
 func TestJwtAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
 	mockTokenParser := new(OAuthMocks.TokenParser)
 	mockDatabase := new(dataMocks.Database)
