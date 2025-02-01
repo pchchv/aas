@@ -141,6 +141,42 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 	}
 }
 
+// RequiresScope is a middleware that checks if the user has the required scope to access the resource.
+func (m *MiddlewareJwt) RequiresScope(scopesAnyOf []string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var ok bool
+			ctx := r.Context()
+			var jwtInfo oauth.JwtInfo
+			if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+				if jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo); !ok {
+					http.Error(w, "unable to cast the context value to JwtInfo in RequiresScope middleware", http.StatusInternalServerError)
+					return
+				}
+			}
+
+			if isAuthorized := m.authHelper.IsAuthorizedToAccessResource(jwtInfo, scopesAnyOf); !isAuthorized {
+				if m.authHelper.IsAuthenticated(jwtInfo) {
+					// User is authenticated but not authorized
+					// Show the unauthorized page
+					http.Redirect(w, r, "/unauthorized", http.StatusFound)
+				} else {
+					// User is not authenticated
+					// Redirect to the authorize endpoint
+					err := m.authHelper.RedirToAuthorize(w, r, constants.AdminConsoleClientIdentifier, m.buildScopeString(scopesAnyOf), config.Get().BaseURL+r.RequestURI)
+					if err != nil {
+						err = errors.New("unable to redirect to authorize in RequiresScope middleware: " + err.Error())
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+					}
+				}
+				return
+			}
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 func (m *MiddlewareJwt) refreshToken(w http.ResponseWriter, r *http.Request, tokenResponse *oauth.TokenResponse) (bool, error) {
 	if tokenResponse.RefreshToken == "" {
 		return false, nil
