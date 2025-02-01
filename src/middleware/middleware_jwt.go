@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/gorilla/sessions"
@@ -212,4 +213,35 @@ func (m *MiddlewareJwt) refreshToken(w http.ResponseWriter, r *http.Request, tok
 	}
 
 	return true, nil
+}
+
+func (m *MiddlewareJwt) buildScopeString(customScopes []string) string {
+	scopeMap := make(map[string]bool)
+	// Default required scopes
+	defaultScopes := []string{
+		"openid",
+		"email",
+		constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier,
+		constants.AdminConsoleResourceIdentifier + ":" + constants.ManageAdminConsolePermissionIdentifier,
+	}
+
+	// Add default scopes first
+	for _, scope := range defaultScopes {
+		scopeMap[strings.ToLower(scope)] = true
+	}
+
+	// Add custom scopes
+	for _, scope := range customScopes {
+		if scope = strings.ToLower(strings.TrimSpace(scope)); scope != "" {
+			scopeMap[scope] = true
+		}
+	}
+
+	var allScopes []string
+	for scope := range scopeMap {
+		allScopes = append(allScopes, scope)
+	}
+	sort.Strings(allScopes)
+
+	return strings.Join(allScopes, " ")
 }
