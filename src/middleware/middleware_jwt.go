@@ -1,10 +1,13 @@
 package middleware
 
 import (
+	"context"
 	"crypto/rsa"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/sessions"
+	"github.com/pchchv/aas/src/constants"
 	"github.com/pchchv/aas/src/database"
 	"github.com/pchchv/aas/src/oauth"
 )
@@ -39,5 +42,25 @@ func NewMiddlewareJwt(sessionStore sessions.Store, tokenParser tokenParser, data
 		database:     database,
 		authHelper:   authHelper,
 		httpClient:   httpClient,
+	}
+}
+
+// JwtAuthorizationHeaderToContext is a middleware that extracts the JWT token from the Authorization header and stores it in the context.
+func (m *MiddlewareJwt) JwtAuthorizationHeaderToContext() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			const BEARER_SCHEMA = "Bearer "
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(authHeader, BEARER_SCHEMA) && len(authHeader) >= len(BEARER_SCHEMA) {
+				tokenStr := authHeader[len(BEARER_SCHEMA):]
+				token, err := m.tokenParser.DecodeAndValidateTokenString(tokenStr, nil, true)
+				if err == nil {
+					ctx = context.WithValue(ctx, constants.ContextKeyBearerToken, *token)
+				}
+			}
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
 	}
 }
